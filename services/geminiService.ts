@@ -23,37 +23,40 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
     const limitedWords = shuffled.slice(0, 50); 
     
     prompt = `
-      I have a vocabulary list for a high-stakes test. 
+      I have a vocabulary list for a test. 
       SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-      Task: Create an extremely challenging multiple-choice test based strictly on this source data.
+      Task: Create a multiple-choice test based strictly on this source data.
       
       For each item in the source data:
       1. Use the 'word' as the question.
-      2. Use the 'meaning' as the Correct Answer.
-      3. CRITICAL: Generate 3 INCORRECT Korean meanings (distractors) that are very difficult to distinguish from the correct one.
-         - Use synonyms with subtle nuance differences.
-         - Use words that students frequently confuse with the target word (similar spelling or similar context).
-         - Use words that belong to the same semantic field.
-         - Ensure the distractors have the same part of speech as the correct answer.
-      4. Avoid obviously wrong or unrelated answers. The goal is to test the student's precise understanding of the word.
-      5. Randomly shuffle the position of the correct answer among the 4 options.
-      6. 'correctAnswerIndex' must point to the correct meaning in the 'options' array.
+      2. Use the 'meaning' as the strictly Correct Answer.
+      
+      STRICT RULES FOR PREVENTING AMBIGUITY (CRITICAL):
+      - Generate 3 distractors that are plausible in terms of part-of-speech but SEMANTICALLY DISTANT from the correct answer.
+      - DO NOT use synonyms, near-synonyms, or words with overlapping meanings.
+      - EXAMPLE: If the word is 'entirely' and the answer is '전적으로', DO NOT use '완전히', '모두', or '통틀어' as distractors. Instead, use words like '우연히' (by chance), '부분적으로' (partially), or '조심스럽게' (carefully).
+      - EACH OPTION MUST BE A SINGLE CLEAR WORD/PHRASE. No commas (e.g., use "결과" instead of "결과, 성과").
+      - Ensure there is absolutely NO overlap in meaning between any of the 4 options.
+      - If a word has multiple meanings, strictly stick to the one provided in the source data.
+      
+      3. Randomly shuffle the position of the correct answer among the 4 options.
+      4. 'correctAnswerIndex' must point to the correct meaning in the 'options' array.
 
       Return the result as a JSON array of Question objects.
     `;
   } else {
     // Mode 2: Fallback (AI Simulation)
     prompt = `
-      Generate a high-difficulty vocabulary test for students based on a simulated curriculum for date: ${date}.
-      Select 50 English words at CEFR B2 to C1 levels.
+      Generate a high-difficulty vocabulary test for students for date: ${date}.
+      Select 50 English words at CEFR B2/C1 levels.
       
-      For each question:
-      1. Select a challenging English word.
-      2. Provide 4 Korean meanings as options. 
-         CRITICAL: For each option, provide only ONE clear meaning. Do not use multiple synonyms separated by commas (e.g., use "사과" instead of "사과, 능금").
-      3. Make the distractors highly plausible and confusing. Use near-synonyms, words often confused due to spelling, or words with related but distinct meanings.
-      4. Ensure only ONE option is strictly correct.
+      CRITICAL RULES FOR SELECTING OPTIONS:
+      - Only ONE option must be correct.
+      - Distractors must be definitively and objectively incorrect for the chosen word.
+      - ABSOLUTELY NO SYNONYMS of the correct answer allowed in the distractors.
+      - Each option must be a SINGLE clear Korean word (no commas).
+      - The semantic gap between the correct answer and distractors must be wide enough that a student who knows the word will not hesitate.
       
       Return the data strictly as a JSON array.
     `;

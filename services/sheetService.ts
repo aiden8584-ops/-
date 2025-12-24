@@ -19,7 +19,6 @@ const parseCSVLine = (line: string): string[] => {
 };
 
 export const fetchSheetTabs = async (sheetId: string): Promise<string[]> => {
-  // Use Google Sheets API v4 to fetch spreadsheet metadata (title of sheets)
   const apiKey = process.env.API_KEY;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title&key=${apiKey}`;
 
@@ -58,9 +57,8 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
     const text = await response.text();
     const lines = text.split('\n');
     const words: SheetWord[] = [];
-    const startIdx = 0; 
 
-    for (let i = startIdx; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
@@ -68,20 +66,20 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
       
       if (cols.length >= 2) {
         const word = cols[0];
-        let meaning = cols[1];
+        const fullMeaning = cols[1];
         
         if (word.toLowerCase() === 'word' || word.toLowerCase() === 'english') continue;
 
-        if (word && meaning) {
-          // If the meaning contains multiple definitions separated by commas, take only the first one as requested.
-          const primaryMeaning = meaning.split(',')[0].trim();
+        if (word && fullMeaning) {
+          // Rule: If multiple meanings exist (comma separated), take only the first one
+          const primaryMeaning = fullMeaning.split(',')[0].trim();
           words.push({ word, meaning: primaryMeaning });
         }
       }
     }
 
     if (words.length === 0) {
-      throw new Error("Found the sheet tab, but could not parse any words. Ensure Col A is Word and Col B is Meaning.");
+      throw new Error("Found the sheet tab, but could not parse any words.");
     }
 
     return words;
