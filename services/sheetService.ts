@@ -93,12 +93,14 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
 export const submitResultToSheet = async (scriptUrl: string, result: QuizResult): Promise<boolean> => {
   try {
     const payload = {
-      tabName: result.date,
+      // Changed from result.date to result.className as per teacher's request
+      tabName: result.className,
       studentName: result.studentName,
       score: result.score,
       total: result.totalQuestions,
       timeTaken: result.timeTakenSeconds,
-      timestamp: result.timestamp
+      timestamp: result.timestamp,
+      testDate: result.date
     };
 
     await fetch(scriptUrl, {

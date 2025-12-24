@@ -13,14 +13,14 @@ const BASE_URL_KEY = 'vocamaster_base_url';
 type DashboardTab = 'status' | 'students' | 'settings';
 
 // Extension for window.aistudio
-// Fixed the conflicting type declaration for aistudio to match internal AIStudio type and added readonly modifier
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
   interface Window {
-    readonly aistudio: AIStudio;
+    // Fix: Remove readonly to match environment's global declaration and avoid "identical modifiers" error
+    aistudio: AIStudio;
   }
 }
 
@@ -55,7 +55,6 @@ const TeacherDashboard: React.FC = () => {
     if (storedBaseUrl) setBaseUrl(storedBaseUrl);
     else autoDetectUrl();
 
-    // Check if paid key is already selected
     if (window.aistudio) {
       window.aistudio.hasSelectedApiKey().then(setHasPaidKey);
     }
@@ -115,12 +114,10 @@ const TeacherDashboard: React.FC = () => {
   const handleOpenPaidKeyDialog = async () => {
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      // Assume the key selection was successful after triggering openSelectKey()
       setHasPaidKey(true);
     }
   };
 
-  // Student Management Logic
   const students = useMemo(() => {
     const studentMap: Record<string, { resultCount: number; incorrectCount: number }> = {};
     
@@ -137,39 +134,6 @@ const TeacherDashboard: React.FC = () => {
 
     return Object.entries(studentMap).map(([name, stats]) => ({ name, ...stats }));
   }, [results, incorrectNotes]);
-
-  const handleDeleteStudent = (name: string) => {
-    if (!confirm(`'${name}' 학생의 모든 시험 기록과 오답 노트를 삭제하시겠습니까?`)) return;
-
-    const newResults = results.filter(r => r.studentName !== name);
-    const newNotes = { ...incorrectNotes };
-    delete newNotes[name];
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newResults));
-    localStorage.setItem(INCORRECT_KEY, JSON.stringify(newNotes));
-    loadData();
-  };
-
-  const handleEditStudentName = (oldName: string) => {
-    const newName = prompt(`'${oldName}' 학생의 새 이름을 입력하세요:`, oldName);
-    if (!newName || newName.trim() === oldName) return;
-
-    const trimmedNewName = newName.trim();
-
-    const newResults = results.map(r => 
-      r.studentName === oldName ? { ...r, studentName: trimmedNewName } : r
-    );
-
-    const newNotes = { ...incorrectNotes };
-    if (newNotes[oldName]) {
-      newNotes[trimmedNewName] = [...(newNotes[trimmedNewName] || []), ...newNotes[oldName]];
-      delete newNotes[oldName];
-    }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newResults));
-    localStorage.setItem(INCORRECT_KEY, JSON.stringify(newNotes));
-    loadData();
-  };
 
   const shareUrl = useMemo(() => {
     if (!sheetId) return "";
@@ -195,7 +159,6 @@ const TeacherDashboard: React.FC = () => {
 
   return (
     <div className="animate-pop space-y-6 pb-20">
-      {/* Navigation Tabs */}
       <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 mb-2">
         {(['status', 'students', 'settings'] as DashboardTab[]).map(tab => (
           <button
@@ -207,7 +170,7 @@ const TeacherDashboard: React.FC = () => {
               : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'
             }`}
           >
-            {tab === 'status' && '📊 실시간 현황'}
+            {tab === 'status' && '📊 배포 현황'}
             {tab === 'students' && '👥 학생 관리'}
             {tab === 'settings' && '⚙️ 환경 설정'}
           </button>
@@ -216,76 +179,56 @@ const TeacherDashboard: React.FC = () => {
 
       {activeTab === 'status' && (
         <div className="space-y-6 animate-pop">
-          {sheetId && (
-            <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div className="space-y-4">
-                  <h4 className="text-lg font-black text-indigo-900">🚀 학생 배포</h4>
-                  <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
-                    <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">수업반 선택</label>
+          {sheetId ? (
+            <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-2xl font-black text-indigo-900 mb-2">🚀 학생 시험 배포</h4>
+                    <p className="text-gray-500 text-sm">학생들에게 공유할 QR코드와 링크를 생성합니다.</p>
+                  </div>
+                  <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100">
+                    <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">수업반(탭) 선택</label>
                     <select 
                       value={selectedClass} 
                       onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl text-indigo-900 font-bold outline-none"
+                      className="w-full px-4 py-4 border-2 border-indigo-200 rounded-2xl text-indigo-900 font-bold outline-none mb-4"
                     >
                       <option value="">-- 반 선택 (전체) --</option>
                       {availableTabs.map(tab => <option key={tab} value={tab}>{tab}</option>)}
                     </select>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="secondary" size="sm" fullWidth onClick={() => {
+                    <div className="flex gap-2">
+                      <Button variant="secondary" size="lg" fullWidth onClick={() => {
                         navigator.clipboard.writeText(shareUrl);
                         setIsCopied(true);
                         setTimeout(() => setIsCopied(false), 2000);
                       }}>
-                        {isCopied ? '복사됨!' : '링크 복사'}
+                        {isCopied ? '링크 복사됨!' : '시험 링크 복사'}
                       </Button>
-                      <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-indigo-900 text-white rounded-lg text-xs font-bold flex items-center justify-center">열기</a>
+                      <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-4 bg-indigo-900 text-white rounded-2xl text-sm font-bold flex items-center justify-center">열기</a>
                     </div>
                   </div>
                 </div>
-                <div className="flex justify-center p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                  <img src={qrUrl} alt="QR" className="w-48 h-48" />
+                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+                  <img src={qrUrl} alt="QR" className="w-56 h-56 mb-4" />
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">QR코드를 학생들에게 보여주세요</p>
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="bg-amber-50 p-10 rounded-3xl border-2 border-amber-100 text-center">
+               <p className="font-black text-amber-900 text-xl mb-2">시트 설정이 필요합니다</p>
+               <p className="text-amber-700 mb-6 text-sm">환경 설정 탭에서 구글 시트 ID를 먼저 입력해주세요.</p>
+               <Button onClick={() => setActiveTab('settings')}>설정하러 가기</Button>
+            </div>
           )}
-
-          <div className="bg-white rounded-3xl shadow-xl border-2 border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h2 className="font-black text-gray-800">최근 응시 기록</h2>
-              <span className="text-xs font-bold text-gray-400">총 {results.length}건</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  <tr>
-                    <th className="px-6 py-4">학생 / 반</th>
-                    <th className="px-6 py-4">점수</th>
-                    <th className="px-6 py-4 text-right">날짜</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {results.slice(0, 50).map((r, idx) => (
-                    <tr key={idx} className="hover:bg-indigo-50/40 text-sm">
-                      <td className="px-6 py-4">
-                        <div className="font-black text-gray-800">{r.studentName}</div>
-                        <div className="text-[10px] text-indigo-400 font-bold">{r.className}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-black text-indigo-600">{r.score}</span>
-                        <span className="text-gray-300">/{r.totalQuestions}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right text-[10px] text-gray-400 font-mono">
-                        {r.date}
-                      </td>
-                    </tr>
-                  ))}
-                  {results.length === 0 && (
-                    <tr><td colSpan={3} className="p-10 text-center text-gray-400 font-bold">기록이 없습니다.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+          
+          <div className="bg-indigo-900 rounded-[2.5rem] p-10 text-white text-center shadow-2xl">
+            <h4 className="text-xl font-black mb-2">✅ 실시간 결과 확인 안내</h4>
+            <p className="text-indigo-200 text-sm mb-0 leading-relaxed">
+              학생들이 시험을 마치면 결과가 구글 시트의 해당 반 탭에 자동으로 저장됩니다.<br/>
+              로컬 응시 기록 섹션은 삭제되었으며, 이제 모든 성적은 선생님의 구글 시트에서 통합 관리하세요.
+            </p>
           </div>
         </div>
       )}
@@ -294,28 +237,8 @@ const TeacherDashboard: React.FC = () => {
         <div className="animate-pop space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {students.map(student => (
-              <div key={student.name} className="bg-white p-6 rounded-3xl shadow-md border border-gray-100 hover:border-indigo-200 transition-colors group">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-xl">👤</div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => handleEditStudentName(student.name)}
-                      className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                      </svg>
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteStudent(student.name)}
-                      className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+              <div key={student.name} className="bg-white p-6 rounded-3xl shadow-md border border-gray-100">
+                <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-xl mb-4">👤</div>
                 <h3 className="text-lg font-black text-gray-800 mb-1">{student.name}</h3>
                 <div className="flex gap-4 mt-4">
                   <div>
@@ -329,13 +252,17 @@ const TeacherDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
+            {students.length === 0 && (
+               <div className="col-span-full py-20 text-center text-gray-400 font-bold">
+                 아직 등록된 학생 데이터가 없습니다.
+               </div>
+            )}
           </div>
         </div>
       )}
 
       {activeTab === 'settings' && (
         <div className="animate-pop space-y-6">
-          {/* AI Quota Management (New) */}
           <div className="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-3xl shadow-xl p-8 text-white">
             <div className="flex justify-between items-start mb-6">
               <div>
@@ -350,7 +277,6 @@ const TeacherDashboard: React.FC = () => {
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 mb-6">
               <p className="text-sm leading-relaxed mb-4">
                 현재 "Quota Exceeded" 에러가 발생한다면 선생님의 구글 유료 프로젝트 API 키를 연동해야 합니다. 
-                결제 수단이 등록된 프로젝트의 키를 선택하면 무제한에 가까운 속도가 보장됩니다.
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
@@ -370,11 +296,6 @@ const TeacherDashboard: React.FC = () => {
                 </a>
               </div>
             </div>
-            {hasPaidKey && (
-              <p className="text-center text-[10px] text-indigo-300 font-bold">
-                ✅ 현재 선생님의 개별 API 키가 적용 중입니다. 429 에러 걱정 없이 시험을 진행할 수 있습니다.
-              </p>
-            )}
           </div>
 
           <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8">
