@@ -20,7 +20,6 @@ const parseCSVLine = (line: string): string[] => {
 
 export const fetchSheetTabs = async (sheetId: string): Promise<string[]> => {
   // Use Google Sheets API v4 to fetch spreadsheet metadata (title of sheets)
-  // This requires the API_KEY to have 'Google Sheets API' enabled in Google Cloud Console.
   const apiKey = process.env.API_KEY;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title&key=${apiKey}`;
 
@@ -69,12 +68,14 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
       
       if (cols.length >= 2) {
         const word = cols[0];
-        const meaning = cols[1];
+        let meaning = cols[1];
         
         if (word.toLowerCase() === 'word' || word.toLowerCase() === 'english') continue;
 
         if (word && meaning) {
-          words.push({ word, meaning });
+          // If the meaning contains multiple definitions separated by commas, take only the first one as requested.
+          const primaryMeaning = meaning.split(',')[0].trim();
+          words.push({ word, meaning: primaryMeaning });
         }
       }
     }
@@ -93,7 +94,6 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
 
 export const submitResultToSheet = async (scriptUrl: string, result: QuizResult): Promise<boolean> => {
   try {
-    // Prepare payload matching the Google Apps Script expectation
     const payload = {
       tabName: result.date,
       studentName: result.studentName,
@@ -103,13 +103,11 @@ export const submitResultToSheet = async (scriptUrl: string, result: QuizResult)
       timestamp: result.timestamp
     };
 
-    // Use no-cors mode because Google Apps Script redirects and causes CORS issues in standard mode.
-    // With no-cors, we can send data but cannot read the response. We assume success if no network error.
     await fetch(scriptUrl, {
       method: 'POST',
       mode: 'no-cors', 
       headers: {
-        'Content-Type': 'text/plain', // Avoid preflight OPTIONS check
+        'Content-Type': 'text/plain',
       },
       body: JSON.stringify(payload)
     });
