@@ -1,15 +1,21 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { QuizResult } from '../types';
+import { QuizResult, IncorrectWord } from '../types';
 import Button from '../components/Button';
 import { fetchSheetTabs } from '../services/sheetService';
 
 const STORAGE_KEY = 'vocamaster_results';
+const INCORRECT_KEY = 'vocamaster_incorrect_notes';
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
+type DashboardTab = 'status' | 'students' | 'settings';
+
 const TeacherDashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<DashboardTab>('status');
   const [results, setResults] = useState<QuizResult[]>([]);
+  const [incorrectNotes, setIncorrectNotes] = useState<Record<string, IncorrectWord[]>>({});
+  
   const [sheetId, setSheetId] = useState('');
   const [scriptUrl, setScriptUrl] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -23,17 +29,7 @@ const TeacherDashboard: React.FC = () => {
   const [qrError, setQrError] = useState(false);
 
   useEffect(() => {
-    const storedResults = localStorage.getItem(STORAGE_KEY);
-    if (storedResults) {
-      try {
-        const parsed = JSON.parse(storedResults) as QuizResult[];
-        parsed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setResults(parsed);
-      } catch (e) {
-        console.error("Failed to parse results");
-      }
-    }
-
+    loadData();
     const storedSheetId = localStorage.getItem(SHEET_ID_KEY);
     const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
     const storedBaseUrl = localStorage.getItem(BASE_URL_KEY);
@@ -43,14 +39,27 @@ const TeacherDashboard: React.FC = () => {
       loadTabs(storedSheetId);
     }
     if (storedScriptUrl) setScriptUrl(storedScriptUrl);
-    
-    // Auto-detect current URL if none stored
-    if (storedBaseUrl) {
-      setBaseUrl(storedBaseUrl);
-    } else {
-      autoDetectUrl();
-    }
+    if (storedBaseUrl) setBaseUrl(storedBaseUrl);
+    else autoDetectUrl();
   }, []);
+
+  const loadData = () => {
+    const storedResults = localStorage.getItem(STORAGE_KEY);
+    if (storedResults) {
+      try {
+        const parsed = JSON.parse(storedResults) as QuizResult[];
+        parsed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setResults(parsed);
+      } catch (e) { console.error("Results parsing error"); }
+    }
+
+    const storedNotes = localStorage.getItem(INCORRECT_KEY);
+    if (storedNotes) {
+      try {
+        setIncorrectNotes(JSON.parse(storedNotes));
+      } catch (e) { console.error("Notes parsing error"); }
+    }
+  };
 
   const autoDetectUrl = () => {
     const currentHref = window.location.origin + window.location.pathname;
@@ -62,9 +71,7 @@ const TeacherDashboard: React.FC = () => {
     try {
       const tabs = await fetchSheetTabs(id);
       setAvailableTabs(tabs);
-    } catch (e) {
-      console.error("Failed to load tabs");
-    }
+    } catch (e) { console.error("Tabs loading error"); }
   };
 
   const handleSaveConfig = () => {
@@ -75,24 +82,70 @@ const TeacherDashboard: React.FC = () => {
     
     localStorage.setItem(SHEET_ID_KEY, cleanId);
     setSheetId(cleanId);
-    
-    if (scriptUrl.trim()) {
-      localStorage.setItem(SCRIPT_URL_KEY, scriptUrl.trim());
-    } else {
-      localStorage.removeItem(SCRIPT_URL_KEY);
-    }
-
-    if (baseUrl.trim()) {
-      localStorage.setItem(BASE_URL_KEY, baseUrl.trim());
-    }
+    if (scriptUrl.trim()) localStorage.setItem(SCRIPT_URL_KEY, scriptUrl.trim());
+    else localStorage.removeItem(SCRIPT_URL_KEY);
+    if (baseUrl.trim()) localStorage.setItem(BASE_URL_KEY, baseUrl.trim());
 
     loadTabs(cleanId);
-
     setTimeout(() => {
       setIsSaving(false);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
     }, 500);
+  };
+
+  // Student Management Logic
+  const students = useMemo(() => {
+    const studentMap: Record<string, { resultCount: number; incorrectCount: number }> = {};
+    
+    results.forEach(r => {
+      if (!studentMap[r.studentName]) studentMap[r.studentName] = { resultCount: 0, incorrectCount: 0 };
+      studentMap[r.studentName].resultCount++;
+    });
+
+    // Fix: Use Object.keys to iterate and avoid TypeScript inference issues with Object.entries returning 'unknown' in some environments
+    Object.keys(incorrectNotes).forEach((name) => {
+      const words = incorrectNotes[name];
+      if (!studentMap[name]) studentMap[name] = { resultCount: 0, incorrectCount: 0 };
+      studentMap[name].incorrectCount = words.length;
+    });
+
+    return Object.entries(studentMap).map(([name, stats]) => ({ name, ...stats }));
+  }, [results, incorrectNotes]);
+
+  const handleDeleteStudent = (name: string) => {
+    if (!confirm(`'${name}' 학생의 모든 시험 기록과 오답 노트를 삭제하시겠습니까?`)) return;
+
+    const newResults = results.filter(r => r.studentName !== name);
+    const newNotes = { ...incorrectNotes };
+    delete newNotes[name];
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newResults));
+    localStorage.setItem(INCORRECT_KEY, JSON.stringify(newNotes));
+    loadData();
+  };
+
+  const handleEditStudentName = (oldName: string) => {
+    const newName = prompt(`'${oldName}' 학생의 새 이름을 입력하세요:`, oldName);
+    if (!newName || newName.trim() === oldName) return;
+
+    const trimmedNewName = newName.trim();
+
+    // 1. Update Results
+    const newResults = results.map(r => 
+      r.studentName === oldName ? { ...r, studentName: trimmedNewName } : r
+    );
+
+    // 2. Update Incorrect Notes
+    const newNotes = { ...incorrectNotes };
+    if (newNotes[oldName]) {
+      newNotes[trimmedNewName] = [...(newNotes[trimmedNewName] || []), ...newNotes[oldName]];
+      delete newNotes[oldName];
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newResults));
+    localStorage.setItem(INCORRECT_KEY, JSON.stringify(newNotes));
+    loadData();
   };
 
   const shareUrl = useMemo(() => {
@@ -102,12 +155,9 @@ const TeacherDashboard: React.FC = () => {
     if (scriptUrl) params.set('script', scriptUrl.trim());
     if (selectedClass) params.set('class_name', selectedClass);
     params.set('date', new Date().toISOString().split('T')[0]);
-    
-    const qs = params.toString();
     const cleanBase = baseUrl.trim() || (window.location.origin + window.location.pathname);
     const connector = cleanBase.includes('?') ? '&' : '?';
-    
-    return `${cleanBase}${connector}${qs}`;
+    return `${cleanBase}${connector}${params.toString()}`;
   }, [sheetId, scriptUrl, selectedClass, baseUrl]);
 
   const qrUrl = useMemo(() => {
@@ -115,219 +165,208 @@ const TeacherDashboard: React.FC = () => {
     return `https://quickchart.io/qr?text=${encodeURIComponent(shareUrl)}&size=400&margin=2&ecLevel=H`;
   }, [shareUrl]);
 
-  useEffect(() => {
-    if (qrUrl) {
-      setQrLoading(true);
-      setQrError(false);
-    }
-  }, [qrUrl]);
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const clearData = () => {
-    if (confirm("이 브라우저에 저장된 모든 학생 응시 기록을 삭제하시겠습니까?")) {
-      localStorage.removeItem(STORAGE_KEY);
-      setResults([]);
-    }
-  };
-
   const isInvalidUrl = useMemo(() => {
     const lower = baseUrl.toLowerCase();
     return lower.includes('vercel.com') && !lower.includes('vercel.app');
   }, [baseUrl]);
 
   return (
-    <div className="animate-pop space-y-8 pb-20">
-      <div className={`bg-white rounded-3xl shadow-xl border-2 transition-all duration-300 p-8 ${isSaved ? 'border-green-400 ring-4 ring-green-50' : 'border-indigo-50'}`}>
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-black text-indigo-900 flex items-center gap-2">
-            ⚙️ 환경 설정
-          </h3>
-          {isSaved && <span className="text-green-600 font-bold text-sm flex items-center gap-1 animate-bounce">✅ 저장되었습니다</span>}
-        </div>
-        
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-black text-gray-500 mb-1 uppercase tracking-tighter">구글 시트 ID</label>
-              <input 
-                type="text" 
-                value={sheetId}
-                onChange={(e) => setSheetId(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-mono text-sm transition-all"
-                placeholder="시트 ID 입력"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-black text-gray-500 mb-1 uppercase tracking-tighter">Apps Script URL</label>
-              <input 
-                type="text" 
-                value={scriptUrl}
-                onChange={(e) => setScriptUrl(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-mono text-sm transition-all"
-                placeholder="결과 전송용 URL"
-              />
-            </div>
-          </div>
+    <div className="animate-pop space-y-6 pb-20">
+      {/* Navigation Tabs */}
+      <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 mb-2">
+        {(['status', 'students', 'settings'] as DashboardTab[]).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-3 px-4 rounded-xl text-sm font-black transition-all ${
+              activeTab === tab 
+              ? 'bg-indigo-600 text-white shadow-lg' 
+              : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'
+            }`}
+          >
+            {tab === 'status' && '📊 실시간 현황'}
+            {tab === 'students' && '👥 학생 관리'}
+            {tab === 'settings' && '⚙️ 환경 설정'}
+          </button>
+        ))}
+      </div>
 
-          <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-200">
-            <div className="flex justify-between items-end mb-2">
-              <label className="block text-sm font-black text-amber-900 uppercase tracking-tighter">학생 접속 주소 (Base URL)</label>
-              <button 
-                type="button" 
-                onClick={autoDetectUrl}
-                className="text-[10px] bg-amber-200 hover:bg-amber-300 text-amber-900 px-2 py-1 rounded-md font-bold transition-colors"
-              >
-                현재 주소로 자동 설정
-              </button>
-            </div>
-            <input 
-              type="text" 
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 outline-none font-mono text-sm ${isInvalidUrl ? 'border-red-400 bg-red-50 text-red-900' : 'border-amber-200 bg-white'}`}
-              placeholder="https://your-site.vercel.app"
-            />
-            {isInvalidUrl && (
-              <p className="mt-2 text-xs text-red-600 font-black animate-shake">
-                ⚠️ 경고: 주소가 vercel.com으로 설정되어 있습니다. <br/>
-                학생들이 접속할 수 있도록 실제 배포된 주소(예: .vercel.app)를 입력해 주세요.
-              </p>
-            )}
-            <p className="mt-2 text-[10px] text-amber-700 font-medium">
-              * 학생들이 이 QR을 찍었을 때 도착할 웹사이트 주소입니다.
-            </p>
-          </div>
-
-          <Button onClick={handleSaveConfig} fullWidth disabled={isSaving || isInvalidUrl} className={`py-4 shadow-xl transition-all ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
-            {isSaving ? '저장 중...' : (isSaved ? '✅ 설정 저장 완료' : '설정 저장하기')}
-          </Button>
-
+      {activeTab === 'status' && (
+        <div className="space-y-6 animate-pop">
+          {/* Deployment Section (Condensed) */}
           {sheetId && (
-            <div className="mt-10 border-t-2 border-dashed border-gray-100 pt-10 animate-pop">
-               <h4 className="text-lg font-black text-gray-800 mb-6 flex items-center gap-2">🚀 학생 배포 및 QR 코드</h4>
-               
-               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-                  <div className="space-y-6">
-                    <div className="bg-indigo-50 p-6 rounded-3xl border-2 border-indigo-100">
-                      <div className="mb-4">
-                        <label className="block text-xs font-black text-indigo-800 mb-2 uppercase tracking-widest">배포할 수업반 선택 (선택사항)</label>
-                        <select 
-                          value={selectedClass} 
-                          onChange={(e) => setSelectedClass(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl text-indigo-900 font-bold outline-none focus:ring-4 focus:ring-indigo-100"
-                        >
-                          <option value="">-- 반을 선택하세요 (전체 노출) --</option>
-                          {availableTabs.map(tab => (
-                            <option key={tab} value={tab}>{tab}</option>
-                          ))}
-                        </select>
-                        <p className="text-[10px] text-indigo-400 mt-2 font-bold leading-tight">
-                          {selectedClass 
-                            ? `현재 [${selectedClass}] 반 전용 모드입니다. 학생은 이름만 쓰면 바로 시작합니다.` 
-                            : '현재 전체 모드입니다. 학생은 접속 후 자신의 반을 직접 골라야 합니다.'}
-                        </p>
-                      </div>
-
-                      <label className="block text-xs font-black text-indigo-800 mb-2 uppercase tracking-widest">초대 링크</label>
-                      <div className="flex flex-col gap-2">
-                          <input readOnly value={shareUrl} className="w-full px-4 py-3 text-xs bg-white border-2 border-indigo-100 rounded-xl text-indigo-900 font-mono shadow-inner" />
-                          <div className="flex gap-2">
-                            <Button variant="secondary" size="md" onClick={handleCopyLink} className="flex-1 font-bold">
-                              {isCopied ? '복사됨!' : '링크 복사'}
-                            </Button>
-                            <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-indigo-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center shadow-lg">테스트</a>
-                          </div>
-                      </div>
+            <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div className="space-y-4">
+                  <h4 className="text-lg font-black text-indigo-900">🚀 학생 배포</h4>
+                  <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+                    <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">수업반 선택</label>
+                    <select 
+                      value={selectedClass} 
+                      onChange={(e) => setSelectedClass(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl text-indigo-900 font-bold outline-none"
+                    >
+                      <option value="">-- 반 선택 (전체) --</option>
+                      {availableTabs.map(tab => <option key={tab} value={tab}>{tab}</option>)}
+                    </select>
+                    <div className="mt-4 flex gap-2">
+                      <Button variant="secondary" size="sm" fullWidth onClick={() => {
+                        navigator.clipboard.writeText(shareUrl);
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}>
+                        {isCopied ? '복사됨!' : '링크 복사'}
+                      </Button>
+                      <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-indigo-900 text-white rounded-lg text-xs font-bold flex items-center justify-center">열기</a>
                     </div>
                   </div>
-
-                  <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-4 border-dotted border-gray-200 rounded-[3rem] animate-pop relative min-h-[460px]">
-                    {qrLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10 rounded-[3rem]">
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                            <span className="text-sm font-black text-indigo-600">QR 갱신 중...</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {qrError && !qrLoading && (
-                       <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-10 rounded-[3rem] p-10 text-center">
-                         <p className="text-red-600 font-bold">QR 이미지를 불러올 수 없습니다.</p>
-                       </div>
-                    )}
-
-                    <div className="bg-white p-6 rounded-3xl shadow-2xl border-2 border-gray-100 mb-6 group transition-all duration-500 transform hover:scale-105">
-                      {qrUrl && (
-                        <img 
-                          src={qrUrl} 
-                          alt="QR" 
-                          className={`w-64 h-64 md:w-80 md:h-80 transition-opacity duration-300 ${qrLoading ? 'opacity-0' : 'opacity-100'}`}
-                          onLoad={() => setQrLoading(false)} 
-                          onError={() => { setQrLoading(false); setQrError(true); }} 
-                        />
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xl font-black text-gray-800 tracking-tight">
-                        {selectedClass ? `[${selectedClass}] 반` : '전체 학생'} 단어시험
-                      </p>
-                      <p className="text-sm font-bold text-indigo-600 mt-1">이 QR 코드를 빔 프로젝터로 띄워주세요.</p>
-                      {isInvalidUrl && <p className="text-[11px] text-red-500 font-black mt-2">※ 주소 설정 오류로 인해 접속이 안 될 수 있습니다.</p>}
-                    </div>
-                  </div>
-               </div>
+                </div>
+                <div className="flex justify-center p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                  <img src={qrUrl} alt="QR" className="w-48 h-48" />
+                </div>
+              </div>
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="bg-white rounded-3xl shadow-xl border-2 border-gray-100 overflow-hidden">
-        <div className="p-8 border-b-2 border-gray-50 flex justify-between items-center bg-gray-50/50">
-          <h2 className="text-xl font-black text-gray-800">실시간 응시 현황</h2>
-          <button onClick={clearData} className="px-4 py-2 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl text-xs font-black transition-colors">데이터 리셋</button>
-        </div>
-        <div className="overflow-x-auto">
-          {results.length === 0 ? (
-            <div className="p-20 text-center text-gray-400 font-bold">아직 응시 기록이 없습니다.</div>
-          ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">수업 / 날짜</th>
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">학생</th>
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">점수</th>
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">기록</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {results.map((r, idx) => (
-                  <tr key={idx} className="hover:bg-indigo-50/40">
-                    <td className="px-8 py-5">
-                      <div className="text-sm font-black text-gray-800">{r.className}</div>
-                      <div className="text-[10px] text-gray-400 font-bold">{r.date}</div>
-                    </td>
-                    <td className="px-8 py-5 text-sm font-bold text-gray-700">{r.studentName}</td>
-                    <td className="px-8 py-5 text-lg font-black text-indigo-600">{r.score} <span className="text-gray-300 text-xs font-normal">/ {r.totalQuestions}</span></td>
-                    <td className="px-8 py-5 text-xs font-mono font-bold text-gray-400 text-right">{formatTime(r.timeTakenSeconds)}</td>
+          {/* Results Table */}
+          <div className="bg-white rounded-3xl shadow-xl border-2 border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h2 className="font-black text-gray-800">최근 응시 기록</h2>
+              <span className="text-xs font-bold text-gray-400">총 {results.length}건</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  <tr>
+                    <th className="px-6 py-4">학생 / 반</th>
+                    <th className="px-6 py-4">점수</th>
+                    <th className="px-6 py-4 text-right">날짜</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {results.slice(0, 50).map((r, idx) => (
+                    <tr key={idx} className="hover:bg-indigo-50/40 text-sm">
+                      <td className="px-6 py-4">
+                        <div className="font-black text-gray-800">{r.studentName}</div>
+                        <div className="text-[10px] text-indigo-400 font-bold">{r.className}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-black text-indigo-600">{r.score}</span>
+                        <span className="text-gray-300">/{r.totalQuestions}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-[10px] text-gray-400 font-mono">
+                        {r.date}
+                      </td>
+                    </tr>
+                  ))}
+                  {results.length === 0 && (
+                    <tr><td colSpan={3} className="p-10 text-center text-gray-400 font-bold">기록이 없습니다.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'students' && (
+        <div className="animate-pop space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {students.map(student => (
+              <div key={student.name} className="bg-white p-6 rounded-3xl shadow-md border border-gray-100 hover:border-indigo-200 transition-colors group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-xl">👤</div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => handleEditStudentName(student.name)}
+                      className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600"
+                      title="이름 수정"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteStudent(student.name)}
+                      className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"
+                      title="데이터 삭제"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <h3 className="text-lg font-black text-gray-800 mb-1">{student.name}</h3>
+                <div className="flex gap-4 mt-4">
+                  <div>
+                    <div className="text-[10px] font-black text-gray-400 uppercase">시험 응시</div>
+                    <div className="text-xl font-black text-indigo-600">{student.resultCount}회</div>
+                  </div>
+                  <div className="border-l border-gray-100 pl-4">
+                    <div className="text-[10px] font-black text-gray-400 uppercase">오답 단어</div>
+                    <div className="text-xl font-black text-red-500">{student.incorrectCount}개</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {students.length === 0 && (
+              <div className="col-span-full p-20 text-center text-gray-400 font-bold bg-white rounded-3xl border border-dashed border-gray-200">
+                등록된 학생이 없습니다.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8 animate-pop">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-black text-indigo-900">환경 설정</h3>
+            {isSaved && <span className="text-green-600 font-bold text-sm animate-bounce">✅ 저장됨</span>}
+          </div>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-black text-gray-500 mb-1 uppercase">구글 시트 ID</label>
+                <input 
+                  type="text" 
+                  value={sheetId}
+                  onChange={(e) => setSheetId(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
+                  placeholder="ID 입력"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-gray-500 mb-1 uppercase">Apps Script URL</label>
+                <input 
+                  type="text" 
+                  value={scriptUrl}
+                  onChange={(e) => setScriptUrl(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+            <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-200">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-black text-amber-900 uppercase">학생 접속 주소 (Base URL)</label>
+                <button onClick={autoDetectUrl} className="text-[10px] bg-amber-200 px-2 py-1 rounded-md font-bold">자동 설정</button>
+              </div>
+              <input 
+                type="text" 
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                className={`w-full px-4 py-3 border-2 rounded-xl font-mono text-sm ${isInvalidUrl ? 'border-red-400 bg-red-50' : 'border-amber-200 bg-white'}`}
+              />
+              {isInvalidUrl && <p className="mt-2 text-[10px] text-red-600 font-black">⚠️ .vercel.app 주소로 설정해야 학생 접속이 가능합니다.</p>}
+            </div>
+            <Button onClick={handleSaveConfig} fullWidth disabled={isSaving || isInvalidUrl} className={`py-4 ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
+              {isSaving ? '저장 중...' : (isSaved ? '✅ 설정 저장 완료' : '설정 저장하기')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
