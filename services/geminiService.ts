@@ -1,7 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, SheetWord } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to shuffle array (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -44,9 +43,10 @@ const generateLocalQuiz = (sheetWords: SheetWord[]): Question[] => {
 };
 
 export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord[]): Promise<Question[]> => {
+  // CRITICAL: Instantiate inside function to use the most recent process.env.API_KEY
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = "gemini-3-flash-preview";
   
-  // If no sheet words, we can't do local fallback, but for this app sheet words are primary.
   if (!sheetWords || sheetWords.length === 0) {
     throw new Error("시험을 생성할 단어 데이터가 없습니다.");
   }
@@ -107,10 +107,16 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
     return JSON.parse(text) as Question[];
 
   } catch (error: any) {
-    // If quota exceeded or any API error, fallback to local generation
+    // If the request fails with "Requested entity was not found.", reset key selection and prompt for key selection
+    if (error.message?.includes("Requested entity was not found")) {
+      const aistudio = (window as any).aistudio;
+      if (aistudio && typeof aistudio.openSelectKey === 'function') {
+        await aistudio.openSelectKey();
+      }
+    }
+
     console.warn("Gemini API Error (likely quota). Falling back to local generation:", error.message);
     
-    // Check if it's specifically a 429 error or similar quota issue
     if (error.message?.includes("429") || error.message?.includes("quota") || error.message?.includes("limit")) {
       console.info("Using local quiz engine for stability.");
     }

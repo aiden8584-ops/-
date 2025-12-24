@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { QuizResult, IncorrectWord } from '../types';
 import Button from '../components/Button';
@@ -10,6 +11,18 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 type DashboardTab = 'status' | 'students' | 'settings';
+
+// Extension for window.aistudio
+// Fixed the conflicting type declaration for aistudio to match internal AIStudio type and added readonly modifier
+declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    readonly aistudio: AIStudio;
+  }
+}
 
 const TeacherDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('status');
@@ -25,8 +38,8 @@ const TeacherDashboard: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [qrLoading, setQrLoading] = useState(false);
-  const [qrError, setQrError] = useState(false);
+  
+  const [hasPaidKey, setHasPaidKey] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -41,6 +54,11 @@ const TeacherDashboard: React.FC = () => {
     if (storedScriptUrl) setScriptUrl(storedScriptUrl);
     if (storedBaseUrl) setBaseUrl(storedBaseUrl);
     else autoDetectUrl();
+
+    // Check if paid key is already selected
+    if (window.aistudio) {
+      window.aistudio.hasSelectedApiKey().then(setHasPaidKey);
+    }
   }, []);
 
   const loadData = () => {
@@ -94,6 +112,14 @@ const TeacherDashboard: React.FC = () => {
     }, 500);
   };
 
+  const handleOpenPaidKeyDialog = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Assume the key selection was successful after triggering openSelectKey()
+      setHasPaidKey(true);
+    }
+  };
+
   // Student Management Logic
   const students = useMemo(() => {
     const studentMap: Record<string, { resultCount: number; incorrectCount: number }> = {};
@@ -103,7 +129,6 @@ const TeacherDashboard: React.FC = () => {
       studentMap[r.studentName].resultCount++;
     });
 
-    // Fix: Use Object.keys to iterate and avoid TypeScript inference issues with Object.entries returning 'unknown' in some environments
     Object.keys(incorrectNotes).forEach((name) => {
       const words = incorrectNotes[name];
       if (!studentMap[name]) studentMap[name] = { resultCount: 0, incorrectCount: 0 };
@@ -131,12 +156,10 @@ const TeacherDashboard: React.FC = () => {
 
     const trimmedNewName = newName.trim();
 
-    // 1. Update Results
     const newResults = results.map(r => 
       r.studentName === oldName ? { ...r, studentName: trimmedNewName } : r
     );
 
-    // 2. Update Incorrect Notes
     const newNotes = { ...incorrectNotes };
     if (newNotes[oldName]) {
       newNotes[trimmedNewName] = [...(newNotes[trimmedNewName] || []), ...newNotes[oldName]];
@@ -193,7 +216,6 @@ const TeacherDashboard: React.FC = () => {
 
       {activeTab === 'status' && (
         <div className="space-y-6 animate-pop">
-          {/* Deployment Section (Condensed) */}
           {sheetId && (
             <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
@@ -228,7 +250,6 @@ const TeacherDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Results Table */}
           <div className="bg-white rounded-3xl shadow-xl border-2 border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <h2 className="font-black text-gray-800">최근 응시 기록</h2>
@@ -280,7 +301,6 @@ const TeacherDashboard: React.FC = () => {
                     <button 
                       onClick={() => handleEditStudentName(student.name)}
                       className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600"
-                      title="이름 수정"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -289,7 +309,6 @@ const TeacherDashboard: React.FC = () => {
                     <button 
                       onClick={() => handleDeleteStudent(student.name)}
                       className="p-2 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500"
-                      title="데이터 삭제"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -310,60 +329,98 @@ const TeacherDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
-            {students.length === 0 && (
-              <div className="col-span-full p-20 text-center text-gray-400 font-bold bg-white rounded-3xl border border-dashed border-gray-200">
-                등록된 학생이 없습니다.
-              </div>
-            )}
           </div>
         </div>
       )}
 
       {activeTab === 'settings' && (
-        <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8 animate-pop">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-black text-indigo-900">환경 설정</h3>
-            {isSaved && <span className="text-green-600 font-bold text-sm animate-bounce">✅ 저장됨</span>}
+        <div className="animate-pop space-y-6">
+          {/* AI Quota Management (New) */}
+          <div className="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-3xl shadow-xl p-8 text-white">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-xl font-black mb-1">AI 사용량(Quota) 관리</h3>
+                <p className="text-indigo-200 text-sm">사용량 초과(429 에러) 발생 시 유료 프로젝트 키를 연결하세요.</p>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${hasPaidKey ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'}`}>
+                {hasPaidKey ? 'Paid Key Active' : 'Free Tier'}
+              </div>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 mb-6">
+              <p className="text-sm leading-relaxed mb-4">
+                현재 "Quota Exceeded" 에러가 발생한다면 선생님의 구글 유료 프로젝트 API 키를 연동해야 합니다. 
+                결제 수단이 등록된 프로젝트의 키를 선택하면 무제한에 가까운 속도가 보장됩니다.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  onClick={handleOpenPaidKeyDialog} 
+                  fullWidth 
+                  className="bg-white text-indigo-900 hover:bg-indigo-50 font-black py-4"
+                >
+                  {hasPaidKey ? '다른 유료 API 키로 변경' : '유료 API 키 선택하기'}
+                </Button>
+                <a 
+                  href="https://ai.google.dev/gemini-api/docs/billing" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-6 py-4 bg-indigo-700/50 hover:bg-indigo-700 text-white rounded-xl text-center text-sm font-bold transition-all border border-indigo-500/30"
+                >
+                  결제 등록 안내 (문서)
+                </a>
+              </div>
+            </div>
+            {hasPaidKey && (
+              <p className="text-center text-[10px] text-indigo-300 font-bold">
+                ✅ 현재 선생님의 개별 API 키가 적용 중입니다. 429 에러 걱정 없이 시험을 진행할 수 있습니다.
+              </p>
+            )}
           </div>
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-black text-gray-500 mb-1 uppercase">구글 시트 ID</label>
+
+          <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-indigo-900">시스템 설정</h3>
+              {isSaved && <span className="text-green-600 font-bold text-sm animate-bounce">✅ 저장됨</span>}
+            </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-black text-gray-500 mb-1 uppercase">구글 시트 ID</label>
+                  <input 
+                    type="text" 
+                    value={sheetId}
+                    onChange={(e) => setSheetId(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
+                    placeholder="ID 입력"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-500 mb-1 uppercase">Apps Script URL</label>
+                  <input 
+                    type="text" 
+                    value={scriptUrl}
+                    onChange={(e) => setScriptUrl(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-200">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-black text-amber-900 uppercase">학생 접속 주소 (Base URL)</label>
+                  <button onClick={autoDetectUrl} className="text-[10px] bg-amber-200 px-2 py-1 rounded-md font-bold">자동 설정</button>
+                </div>
                 <input 
                   type="text" 
-                  value={sheetId}
-                  onChange={(e) => setSheetId(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
-                  placeholder="ID 입력"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  className={`w-full px-4 py-3 border-2 rounded-xl font-mono text-sm ${isInvalidUrl ? 'border-red-400 bg-red-50' : 'border-amber-200 bg-white'}`}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-black text-gray-500 mb-1 uppercase">Apps Script URL</label>
-                <input 
-                  type="text" 
-                  value={scriptUrl}
-                  onChange={(e) => setScriptUrl(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
-                  placeholder="https://..."
-                />
-              </div>
+              <Button onClick={handleSaveConfig} fullWidth disabled={isSaving || isInvalidUrl} className={`py-4 ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
+                {isSaving ? '저장 중...' : (isSaved ? '✅ 설정 저장 완료' : '설정 저장하기')}
+              </Button>
             </div>
-            <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-200">
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-black text-amber-900 uppercase">학생 접속 주소 (Base URL)</label>
-                <button onClick={autoDetectUrl} className="text-[10px] bg-amber-200 px-2 py-1 rounded-md font-bold">자동 설정</button>
-              </div>
-              <input 
-                type="text" 
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                className={`w-full px-4 py-3 border-2 rounded-xl font-mono text-sm ${isInvalidUrl ? 'border-red-400 bg-red-50' : 'border-amber-200 bg-white'}`}
-              />
-              {isInvalidUrl && <p className="mt-2 text-[10px] text-red-600 font-black">⚠️ .vercel.app 주소로 설정해야 학생 접속이 가능합니다.</p>}
-            </div>
-            <Button onClick={handleSaveConfig} fullWidth disabled={isSaving || isInvalidUrl} className={`py-4 ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
-              {isSaving ? '저장 중...' : (isSaved ? '✅ 설정 저장 완료' : '설정 저장하기')}
-            </Button>
           </div>
         </div>
       )}
