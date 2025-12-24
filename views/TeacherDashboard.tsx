@@ -37,7 +37,6 @@ const TeacherDashboard: React.FC = () => {
     if (storedScriptUrl) setScriptUrl(storedScriptUrl);
 
     // Initialize Base URL
-    // If we are in an iframe or editor, try to default to empty or current, user needs to verify.
     const currentHref = window.location.href.split('?')[0].split('#')[0];
     setBaseUrl(currentHref);
   }, []);
@@ -105,7 +104,6 @@ const TeacherDashboard: React.FC = () => {
   const isBlob = baseUrl.startsWith('blob:');
   const isLocal = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.startsWith('file:');
   
-  // Check for common Editor/IDE URLs which are NOT public app URLs
   const isEditorUrl = 
     baseUrl.includes('aistudio.google.com') || 
     baseUrl.includes('script.google.com') || 
@@ -125,24 +123,24 @@ const TeacherDashboard: React.FC = () => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          Configuration
+          환경 설정
         </h3>
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Google Sheet ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">구글 시트 ID</label>
             <input 
               type="text" 
               value={sheetId}
               onChange={(e) => setSheetId(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm"
-              placeholder="Paste Sheet ID here..."
+              placeholder="시트 URL에서 ID를 복사해 붙여넣으세요..."
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Google Apps Script URL (Optional)
+              Google Apps Script URL (결과 자동저장용)
             </label>
             <input 
               type="text" 
@@ -155,18 +153,17 @@ const TeacherDashboard: React.FC = () => {
 
           <div className="pt-2">
             <Button onClick={handleSaveConfig} fullWidth>
-              {isSaved ? 'Settings Saved!' : 'Save Settings'}
+              {isSaved ? '저장 완료!' : '설정 저장'}
             </Button>
           </div>
 
           {sheetId && (
             <div className="mt-8 border-t border-gray-100 pt-6">
-               <h4 className="text-md font-bold text-gray-800 mb-4">Share with Students</h4>
+               <h4 className="text-md font-bold text-gray-800 mb-4">학생 배포용 링크</h4>
                
-               {/* Base URL Configuration */}
                <div className="mb-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                  <label className="block text-xs font-bold text-gray-700 mb-2">
-                   App Base URL (Required)
+                   현재 앱 기본 URL
                  </label>
                  <input 
                     type="text" 
@@ -176,44 +173,35 @@ const TeacherDashboard: React.FC = () => {
                     placeholder="https://your-app-url.vercel.app"
                  />
                  
-                 {/* URL Error Messages */}
                  {isBlob && (
                    <div className="mt-2 text-xs text-red-600 font-bold bg-white p-2 border border-red-200 rounded">
-                     ⛔️ ERROR: 'blob:' URLs are temporary and local. You cannot share this.<br/>
-                     Please deploy this app to a public host (Vercel, Netlify) to get a shareable link.
+                     ⛔️ 오류: 'blob:' URL은 임시 주소입니다. Vercel 등에 먼저 배포하세요.<br/>
                    </div>
                  )}
                  {!isBlob && isLocal && (
                    <div className="mt-2 text-xs text-amber-600 font-bold">
-                     ⚠️ Warning: Local URL (localhost/file) detected. This will ONLY work on THIS computer. Students cannot access this.
+                     ⚠️ 경고: 로컬 주소(localhost)입니다. 학생들에게는 작동하지 않습니다.
                    </div>
                  )}
                  {isEditorUrl && (
                     <div className="mt-2 text-xs text-red-600 font-bold bg-white p-2 border border-red-200 rounded">
-                      ⛔️ NOT A PUBLIC LINK: This address (aistudio/colab/script) is for your editing session only.<br/>
-                      Students cannot log in to your account. You must <strong>Publish/Deploy</strong> this app to get a public link.
+                      ⛔️ 공개 링크가 아닙니다: 에디터 주소는 학생이 접속할 수 없습니다.<br/>
                     </div>
-                 )}
-                 {!isInvalidUrl && baseUrl && (
-                   <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
-                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                     Valid Public URL format
-                   </div>
                  )}
                </div>
                
                <div className={`bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-4 transition-opacity ${isInvalidUrl ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                 <label className="block text-xs font-bold text-indigo-800 mb-2 uppercase">Invite Link</label>
+                 <label className="block text-xs font-bold text-indigo-800 mb-2 uppercase">초대 링크</label>
                  <div className="space-y-2">
                    <textarea
                       readOnly 
-                      value={isInvalidUrl ? "Please enter a valid Public URL above first." : shareUrl} 
+                      value={isInvalidUrl ? "유효한 공개 URL을 먼저 입력하세요." : shareUrl} 
                       onClick={(e) => e.currentTarget.select()}
                       className="w-full h-16 px-3 py-2 text-xs bg-white border border-indigo-200 rounded text-gray-600 focus:outline-none resize-none font-mono break-all"
                    />
                    <div className="flex gap-2">
                       <Button variant="secondary" size="sm" onClick={handleCopyLink} className="flex-1 whitespace-nowrap" disabled={isInvalidUrl}>
-                        {isCopied ? 'Copied!' : 'Copy Link'}
+                        {isCopied ? '복사 완료!' : '링크 복사'}
                       </Button>
                       <a 
                         href={isInvalidUrl ? '#' : shareUrl} 
@@ -221,7 +209,7 @@ const TeacherDashboard: React.FC = () => {
                         rel="noopener noreferrer" 
                         className={`px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center whitespace-nowrap ${isInvalidUrl ? 'pointer-events-none bg-gray-400' : ''}`}
                       >
-                        Test Link
+                        링크 테스트
                       </a>
                    </div>
                  </div>
@@ -229,7 +217,7 @@ const TeacherDashboard: React.FC = () => {
 
                <div className="text-center">
                  <Button onClick={() => setShowQr(!showQr)} variant="secondary" className="mb-4" disabled={isInvalidUrl}>
-                   {showQr ? 'Hide QR Code' : 'Show QR Code for Classroom'}
+                   {showQr ? 'QR 코드 숨기기' : '수업용 QR 코드 보기'}
                  </Button>
                  
                  {showQr && !isInvalidUrl && (
@@ -239,8 +227,7 @@ const TeacherDashboard: React.FC = () => {
                        alt="Student Invite QR Code" 
                        className="w-64 h-64 mb-4 bg-gray-50"
                      />
-                     <p className="text-sm font-bold text-gray-600">Scan to Start Test</p>
-                     <p className="text-xs text-gray-400">Works with standard camera app</p>
+                     <p className="text-sm font-bold text-gray-600">카메라로 스캔하여 시작</p>
                    </div>
                  )}
                </div>
@@ -252,46 +239,30 @@ const TeacherDashboard: React.FC = () => {
       {/* Results Section */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Student Results (Local Only)</h2>
+          <h2 className="text-2xl font-bold text-gray-800">최근 응시 결과 (이 브라우저 전용)</h2>
           <button 
             onClick={clearData}
             className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
           >
-            Clear Data
+            기록 지우기
           </button>
-        </div>
-
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-amber-700">
-                <strong>Note:</strong> This table only shows results from <em>this device</em>. 
-                If you configured the <strong>Apps Script URL</strong> above, check your Google Sheet "Results" tab for all student submissions.
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
           {results.length === 0 ? (
             <div className="p-12 text-center text-gray-500">
-              <p>No tests taken on this device yet.</p>
+              <p>이 기기에서 응시된 기록이 없습니다.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Tab Name</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Student Name</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Score</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Time Taken</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Timestamp</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">수업반</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">학생 이름</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">점수</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">소요 시간</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">응시 일시</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">

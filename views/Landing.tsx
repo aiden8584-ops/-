@@ -18,7 +18,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   const [availableTabs, setAvailableTabs] = useState<string[]>([]);
   const [isLoadingTabs, setIsLoadingTabs] = useState(false);
   const [useDropdown, setUseDropdown] = useState(true);
-  const [manualMode, setManualMode] = useState<'date' | 'text'>('date');
+  const [manualMode, setManualMode] = useState<'date' | 'text'>('text');
 
   useEffect(() => {
     const SHEET_KEY = 'vocamaster_sheet_id';
@@ -73,12 +73,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         setUseDropdown(true);
       } else {
         setUseDropdown(false);
-        setManualMode('date');
+        setManualMode('text');
       }
     } catch (e) {
       console.error(e);
       setUseDropdown(false);
-      setManualMode('date');
+      setManualMode('text');
     } finally {
       setIsLoadingTabs(false);
     }
@@ -126,17 +126,17 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           <div>
             <div className="flex flex-col mb-2">
               <label htmlFor="tabName" className="block text-sm font-semibold text-gray-700">
-                시험일 선택
+                수업반 선택
               </label>
               <p className="text-[11px] text-indigo-500 font-medium">
-                (재시험자는 원래 수업이 진행된 날짜를 선택)
+                (본인의 소속 반을 정확히 선택하세요)
               </p>
             </div>
             
             {isLoadingTabs ? (
               <div className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 text-gray-500 text-sm flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-gray-400 border-t-indigo-600 rounded-full animate-spin"></div>
-                시트에서 날짜 목록을 불러오는 중...
+                시트에서 반 목록을 불러오는 중...
               </div>
             ) : useDropdown && availableTabs.length > 0 ? (
               <div className="relative">
@@ -159,10 +159,10 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
             ) : (
               <div className="relative">
                 <input
-                  type={manualMode}
+                  type={manualMode === 'date' ? 'date' : 'text'}
                   id="tabName"
                   required
-                  placeholder={manualMode === 'text' ? "예: Day1, 05-01..." : ""}
+                  placeholder={manualMode === 'text' ? "예: 서울고, 상문고, 예비고1..." : ""}
                   value={tabName}
                   onChange={(e) => setTabName(e.target.value)}
                   disabled={!hasSheetId}
@@ -171,7 +171,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                 {!isLoadingTabs && hasSheetId && (
                    <div className="flex justify-between items-center mt-1">
                       <p className="text-[11px] text-orange-500">
-                        {manualMode === 'date' ? '달력에서 날짜를 선택하세요.' : '정확한 탭 이름을 입력하세요.'}
+                        {manualMode === 'date' ? '달력에서 날짜를 선택하세요.' : '정확한 반 이름을 입력하세요.'}
                       </p>
                       <button 
                         type="button"

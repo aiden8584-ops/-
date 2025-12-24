@@ -111,7 +111,7 @@ function App() {
   const handleStartQuiz = async (name: string, tabName: string) => {
     setSession({ name, date: tabName });
     setIsLoading(true);
-    setLoadingMessage(`구글 시트 '${tabName}' 탭에 연결 중...`);
+    setLoadingMessage(`구글 시트 '${tabName}' 반에 연결 중...`);
     setIsReviewMode(false);
     setSubmissionStatus('idle');
     
@@ -124,7 +124,7 @@ function App() {
       const sheetWords = await fetchWordsFromSheet(sheetId, tabName);
       
       const count = Math.min(sheetWords.length, 50);
-      setLoadingMessage(`${count}개의 단어를 무작위로 추출하여 시험지를 생성 중입니다...`);
+      setLoadingMessage(`${tabName} 반의 단어 ${count}개를 무작위로 추출하여 시험지를 생성 중입니다...`);
 
       const generatedQuestions = await generateQuizQuestions(tabName, sheetWords);
       
@@ -132,7 +132,7 @@ function App() {
       setCurrentView(AppView.QUIZ);
 
     } catch (error: any) {
-      alert(`오류 발생: ${error.message}\n\n시트 ID와 탭 이름을 확인하고, 시트가 '웹에 게시' 상태인지 확인해주세요.`);
+      alert(`오류 발생: ${error.message}\n\n시트 ID와 수업반 명칭(탭 이름)을 확인하고, 시트가 '웹에 게시' 상태인지 확인해주세요.`);
       console.error(error);
       setSession(null);
     } finally {
