@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { QuizResult } from '../types';
 import Button from '../components/Button';
 import { fetchSheetTabs } from '../services/sheetService';
@@ -19,8 +19,7 @@ const TeacherDashboard: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [showQr, setShowQr] = useState(false);
-  const [qrLoading, setQrLoading] = useState(true);
+  const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(false);
 
   useEffect(() => {
@@ -65,14 +64,6 @@ const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // Reset QR state when parameters change
-  useEffect(() => {
-    if (showQr) {
-      setQrLoading(true);
-      setQrError(false);
-    }
-  }, [baseUrl, sheetId, scriptUrl, showQr, selectedClass]);
-
   const handleSaveConfig = () => {
     setIsSaving(true);
     let cleanId = sheetId.trim();
@@ -101,24 +92,38 @@ const TeacherDashboard: React.FC = () => {
     }, 500);
   };
 
-  const getShareUrl = () => {
+  // Stable shareUrl generation
+  const shareUrl = useMemo(() => {
+    if (!sheetId) return "";
     const params = new URLSearchParams();
-    if (sheetId) params.set('sheet_id', sheetId.trim());
+    params.set('sheet_id', sheetId.trim());
     if (scriptUrl) params.set('script', scriptUrl.trim());
-    // Add selected class to the link so student skips selection
     if (selectedClass) params.set('class_name', selectedClass);
-    // Add today's date automatically
     params.set('date', new Date().toISOString().split('T')[0]);
     
     const qs = params.toString();
     const cleanBase = baseUrl.trim() || (window.location.origin + window.location.pathname);
     const connector = cleanBase.includes('?') ? '&' : '?';
     
-    return qs ? `${cleanBase}${connector}${qs}` : cleanBase;
-  };
+    return `${cleanBase}${connector}${qs}`;
+  }, [sheetId, scriptUrl, selectedClass, baseUrl]);
+
+  // Stable QR URL generation
+  const qrUrl = useMemo(() => {
+    if (!shareUrl) return "";
+    return `https://quickchart.io/qr?text=${encodeURIComponent(shareUrl)}&size=400&margin=2&ecLevel=H`;
+  }, [shareUrl]);
+
+  // Handle QR loading state
+  useEffect(() => {
+    if (qrUrl) {
+      setQrLoading(true);
+      setQrError(false);
+    }
+  }, [qrUrl]);
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(getShareUrl());
+    navigator.clipboard.writeText(shareUrl);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -135,9 +140,6 @@ const TeacherDashboard: React.FC = () => {
       setResults([]);
     }
   };
-
-  const shareUrl = getShareUrl();
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(shareUrl)}&rand=${Date.now()}`;
 
   const isDevelopmentUrl = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('aistudio.google.com');
 
@@ -192,58 +194,79 @@ const TeacherDashboard: React.FC = () => {
 
           {sheetId && (
             <div className="mt-10 border-t-2 border-dashed border-gray-100 pt-10 animate-pop">
-               <h4 className="text-lg font-black text-gray-800 mb-4 flex items-center gap-2">🚀 학생 배포 도구</h4>
+               <h4 className="text-lg font-black text-gray-800 mb-6 flex items-center gap-2">🚀 학생 배포 및 QR 코드</h4>
                
-               <div className="bg-indigo-50 p-6 rounded-3xl border-2 border-indigo-100 mb-6">
-                 <div className="mb-4">
-                   <label className="block text-xs font-black text-indigo-800 mb-2 uppercase tracking-widest">배포할 수업반 선택 (필수)</label>
-                   <select 
-                     value={selectedClass} 
-                     onChange={(e) => setSelectedClass(e.target.value)}
-                     className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl text-indigo-900 font-bold outline-none focus:ring-4 focus:ring-indigo-100"
-                   >
-                     <option value="">-- 반을 선택하세요 --</option>
-                     {availableTabs.map(tab => (
-                       <option key={tab} value={tab}>{tab}</option>
-                     ))}
-                   </select>
-                   <p className="text-[10px] text-indigo-400 mt-2 font-bold">* 반을 선택하면 학생들이 QR 촬영 시 반 선택 과정을 건너뛰고 바로 이름 입력으로 넘어갑니다.</p>
-                 </div>
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                  <div className="space-y-6">
+                    <div className="bg-indigo-50 p-6 rounded-3xl border-2 border-indigo-100">
+                      <div className="mb-4">
+                        <label className="block text-xs font-black text-indigo-800 mb-2 uppercase tracking-widest">배포할 수업반 선택 (선택사항)</label>
+                        <select 
+                          value={selectedClass} 
+                          onChange={(e) => setSelectedClass(e.target.value)}
+                          className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl text-indigo-900 font-bold outline-none focus:ring-4 focus:ring-indigo-100"
+                        >
+                          <option value="">-- 반을 선택하세요 (전체 노출) --</option>
+                          {availableTabs.map(tab => (
+                            <option key={tab} value={tab}>{tab}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-indigo-400 mt-2 font-bold leading-tight">
+                          {selectedClass 
+                            ? `현재 [${selectedClass}] 반 전용 모드입니다. 학생은 이름만 쓰면 바로 시작합니다.` 
+                            : '현재 전체 모드입니다. 학생은 접속 후 자신의 반을 직접 골라야 합니다.'}
+                        </p>
+                      </div>
 
-                 <label className="block text-xs font-black text-indigo-800 mb-2 uppercase tracking-widest">초대 링크</label>
-                 <div className="flex flex-col sm:flex-row gap-2">
-                    <input readOnly value={shareUrl} className="flex-1 px-4 py-3 text-xs bg-white border-2 border-indigo-100 rounded-xl text-indigo-900 font-mono shadow-inner" />
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="md" onClick={handleCopyLink} className="whitespace-nowrap px-6 flex-1 font-bold">
-                        {isCopied ? '복사됨!' : '복사'}
-                      </Button>
-                      <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-indigo-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center whitespace-nowrap shadow-lg">테스트</a>
+                      <label className="block text-xs font-black text-indigo-800 mb-2 uppercase tracking-widest">초대 링크</label>
+                      <div className="flex flex-col gap-2">
+                          <input readOnly value={shareUrl} className="w-full px-4 py-3 text-xs bg-white border-2 border-indigo-100 rounded-xl text-indigo-900 font-mono shadow-inner" />
+                          <div className="flex gap-2">
+                            <Button variant="secondary" size="md" onClick={handleCopyLink} className="flex-1 font-bold">
+                              {isCopied ? '복사됨!' : '링크 복사'}
+                            </Button>
+                            <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-indigo-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-colors flex items-center justify-center shadow-lg">테스트</a>
+                          </div>
+                      </div>
                     </div>
-                 </div>
-               </div>
+                  </div>
 
-               <div className="text-center">
-                 <Button onClick={() => setShowQr(!showQr)} disabled={!selectedClass} variant="secondary" className="mb-6 px-10 rounded-full border-2 border-indigo-200">
-                   {!selectedClass ? '반을 먼저 선택해 주세요' : (showQr ? 'QR 코드 닫기' : `📢 ${selectedClass} 반 QR 코드 생성`)}
-                 </Button>
-                 
-                 {showQr && selectedClass && (
-                   <div className="flex flex-col items-center justify-center p-10 bg-gray-50 border-4 border-dotted border-gray-200 rounded-[3rem] animate-pop relative min-h-[400px]">
-                     {qrLoading && (
-                       <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10 rounded-[3rem]">
-                         <div className="flex flex-col items-center gap-4">
+                  {/* QR SECTION - ALWAYS VISIBLE */}
+                  <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-4 border-dotted border-gray-200 rounded-[3rem] animate-pop relative min-h-[460px]">
+                    {qrLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10 rounded-[3rem]">
+                        <div className="flex flex-col items-center gap-4">
                             <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                            <span className="text-sm font-black text-indigo-600">QR 생성 중...</span>
-                         </div>
+                            <span className="text-sm font-black text-indigo-600">QR 갱신 중...</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {qrError && !qrLoading && (
+                       <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-10 rounded-[3rem] p-10 text-center">
+                         <p className="text-red-600 font-bold">QR 이미지를 불러올 수 없습니다.</p>
                        </div>
-                     )}
-                     <div className="bg-white p-8 rounded-3xl shadow-2xl border-2 border-gray-100 mb-6 group transition-transform hover:scale-105">
-                       <img src={qrUrl} alt="QR" className="w-56 h-56 md:w-72 md:h-72" onLoad={() => setQrLoading(false)} onError={() => { setQrLoading(false); setQrError(true); }} />
-                     </div>
-                     <p className="text-lg font-black text-gray-800 tracking-tight">[{selectedClass}] 반 단어시험 시작</p>
-                     <p className="text-xs text-gray-400 mt-1">이 화면을 빔 프로젝터로 띄워주세요.</p>
-                   </div>
-                 )}
+                    )}
+
+                    <div className="bg-white p-6 rounded-3xl shadow-2xl border-2 border-gray-100 mb-6 group transition-all duration-500 transform hover:scale-105">
+                      {qrUrl && (
+                        <img 
+                          src={qrUrl} 
+                          alt="QR" 
+                          className={`w-64 h-64 md:w-80 md:h-80 transition-opacity duration-300 ${qrLoading ? 'opacity-0' : 'opacity-100'}`}
+                          onLoad={() => setQrLoading(false)} 
+                          onError={() => { setQrLoading(false); setQrError(true); }} 
+                        />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-black text-gray-800 tracking-tight">
+                        {selectedClass ? `[${selectedClass}] 반` : '전체 학생'} 단어시험
+                      </p>
+                      <p className="text-sm font-bold text-indigo-600 mt-1">이 QR 코드를 빔 프로젝터로 띄워주세요.</p>
+                      {!selectedClass && <p className="text-[11px] text-gray-400 mt-2 font-medium">※ 반을 선택하면 학생들이 더 빠르게 시험을 시작할 수 있습니다.</p>}
+                    </div>
+                  </div>
                </div>
             </div>
           )}
@@ -252,8 +275,8 @@ const TeacherDashboard: React.FC = () => {
 
       <div className="bg-white rounded-3xl shadow-xl border-2 border-gray-100 overflow-hidden">
         <div className="p-8 border-b-2 border-gray-50 flex justify-between items-center bg-gray-50/50">
-          <h2 className="text-xl font-black text-gray-800">최근 응시 기록</h2>
-          <button onClick={clearData} className="px-4 py-2 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl text-xs font-black transition-colors">기록 전체 삭제</button>
+          <h2 className="text-xl font-black text-gray-800">실시간 응시 현황</h2>
+          <button onClick={clearData} className="px-4 py-2 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl text-xs font-black transition-colors">데이터 리셋</button>
         </div>
         <div className="overflow-x-auto">
           {results.length === 0 ? (
@@ -262,10 +285,10 @@ const TeacherDashboard: React.FC = () => {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase">날짜 / 반</th>
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase">이름</th>
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase">점수</th>
-                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase text-right">소요 시간</th>
+                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">수업 / 날짜</th>
+                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">학생</th>
+                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">점수</th>
+                  <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">기록</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
