@@ -37,7 +37,7 @@ const TeacherDashboard: React.FC = () => {
     if (storedScriptUrl) setScriptUrl(storedScriptUrl);
 
     // Initialize Base URL
-    const currentHref = window.location.href.split('?')[0].split('#')[0];
+    const currentHref = window.location.origin + window.location.pathname;
     setBaseUrl(currentHref);
   }, []);
 
@@ -92,7 +92,7 @@ const TeacherDashboard: React.FC = () => {
   };
 
   const clearData = () => {
-    if (confirm("Are you sure you want to clear all student records on this device?")) {
+    if (confirm("이 브라우저에 저장된 모든 학생 응시 기록을 삭제하시겠습니까?")) {
       localStorage.removeItem(STORAGE_KEY);
       setResults([]);
     }
@@ -100,19 +100,13 @@ const TeacherDashboard: React.FC = () => {
 
   const shareUrl = getShareUrl();
   
-  // Validation Logic
+  // Validation Logic (Warning only, not blocking)
   const isBlob = baseUrl.startsWith('blob:');
   const isLocal = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.startsWith('file:');
-  
   const isEditorUrl = 
     baseUrl.includes('aistudio.google.com') || 
     baseUrl.includes('script.google.com') || 
-    baseUrl.includes('colab.research.google.com') ||
-    baseUrl.includes('github.dev') ||
-    baseUrl.includes('stackblitz.com') ||
-    baseUrl.includes('codesandbox.io');
-
-  const isInvalidUrl = isBlob || isLocal || isEditorUrl;
+    baseUrl.includes('colab.research.google.com');
 
   return (
     <div className="animate-pop space-y-8 pb-10">
@@ -159,55 +153,45 @@ const TeacherDashboard: React.FC = () => {
 
           {sheetId && (
             <div className="mt-8 border-t border-gray-100 pt-6">
-               <h4 className="text-md font-bold text-gray-800 mb-4">학생 배포용 링크</h4>
+               <h4 className="text-md font-bold text-gray-800 mb-4">학생 배포용 링크 생성</h4>
                
                <div className="mb-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                  <label className="block text-xs font-bold text-gray-700 mb-2">
-                   현재 앱 기본 URL
+                   현재 앱 주소 (자동 감지됨)
                  </label>
                  <input 
                     type="text" 
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none ${isInvalidUrl ? 'border-red-500 bg-red-50 text-red-900' : 'border-gray-300 text-gray-600 focus:border-indigo-500'}`}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none border-gray-300 text-gray-600 focus:border-indigo-500`}
                     placeholder="https://your-app-url.vercel.app"
                  />
                  
-                 {isBlob && (
-                   <div className="mt-2 text-xs text-red-600 font-bold bg-white p-2 border border-red-200 rounded">
-                     ⛔️ 오류: 'blob:' URL은 임시 주소입니다. Vercel 등에 먼저 배포하세요.<br/>
+                 {(isBlob || isLocal || isEditorUrl) && (
+                   <div className="mt-2 text-xs text-amber-600 font-medium bg-amber-50 p-2 border border-amber-200 rounded">
+                     ⚠️ 알림: 현재 주소가 로컬이나 미리보기 환경입니다. 실제 배포 후에는 해당 주소를 입력하여 링크를 생성하세요.
                    </div>
-                 )}
-                 {!isBlob && isLocal && (
-                   <div className="mt-2 text-xs text-amber-600 font-bold">
-                     ⚠️ 경고: 로컬 주소(localhost)입니다. 학생들에게는 작동하지 않습니다.
-                   </div>
-                 )}
-                 {isEditorUrl && (
-                    <div className="mt-2 text-xs text-red-600 font-bold bg-white p-2 border border-red-200 rounded">
-                      ⛔️ 공개 링크가 아닙니다: 에디터 주소는 학생이 접속할 수 없습니다.<br/>
-                    </div>
                  )}
                </div>
                
-               <div className={`bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-4 transition-opacity ${isInvalidUrl ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                 <label className="block text-xs font-bold text-indigo-800 mb-2 uppercase">초대 링크</label>
+               <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 mb-4">
+                 <label className="block text-xs font-bold text-indigo-800 mb-2 uppercase">초대용 전체 링크</label>
                  <div className="space-y-2">
                    <textarea
                       readOnly 
-                      value={isInvalidUrl ? "유효한 공개 URL을 먼저 입력하세요." : shareUrl} 
+                      value={shareUrl} 
                       onClick={(e) => e.currentTarget.select()}
                       className="w-full h-16 px-3 py-2 text-xs bg-white border border-indigo-200 rounded text-gray-600 focus:outline-none resize-none font-mono break-all"
                    />
                    <div className="flex gap-2">
-                      <Button variant="secondary" size="sm" onClick={handleCopyLink} className="flex-1 whitespace-nowrap" disabled={isInvalidUrl}>
+                      <Button variant="secondary" size="sm" onClick={handleCopyLink} className="flex-1 whitespace-nowrap">
                         {isCopied ? '복사 완료!' : '링크 복사'}
                       </Button>
                       <a 
-                        href={isInvalidUrl ? '#' : shareUrl} 
+                        href={shareUrl} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className={`px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center whitespace-nowrap ${isInvalidUrl ? 'pointer-events-none bg-gray-400' : ''}`}
+                        className={`px-4 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center whitespace-nowrap`}
                       >
                         링크 테스트
                       </a>
@@ -216,18 +200,26 @@ const TeacherDashboard: React.FC = () => {
                </div>
 
                <div className="text-center">
-                 <Button onClick={() => setShowQr(!showQr)} variant="secondary" className="mb-4" disabled={isInvalidUrl}>
-                   {showQr ? 'QR 코드 숨기기' : '수업용 QR 코드 보기'}
+                 <Button onClick={() => setShowQr(!showQr)} variant="secondary" className="mb-4">
+                   {showQr ? 'QR 코드 숨기기' : '수업용 QR 코드 생성'}
                  </Button>
                  
-                 {showQr && !isInvalidUrl && (
+                 {showQr && (
                    <div className="flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl animate-pop">
-                     <img 
-                       src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(shareUrl)}`} 
-                       alt="Student Invite QR Code" 
-                       className="w-64 h-64 mb-4 bg-gray-50"
-                     />
-                     <p className="text-sm font-bold text-gray-600">카메라로 스캔하여 시작</p>
+                     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                       <img 
+                         src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(shareUrl)}`} 
+                         alt="Student Invite QR Code" 
+                         className="w-48 h-48 md:w-64 md:h-64"
+                         onLoad={() => console.log('QR Code Loaded')}
+                         onError={(e) => {
+                           console.error('QR Load Error');
+                           (e.target as HTMLImageElement).src = 'https://via.placeholder.com/250?text=QR+Load+Failed';
+                         }}
+                       />
+                     </div>
+                     <p className="text-sm font-bold text-gray-600 mt-4">카메라로 스캔하여 시험 시작</p>
+                     <p className="text-[10px] text-gray-400 mt-1">QR 제공: qrserver.com</p>
                    </div>
                  )}
                </div>
@@ -239,7 +231,7 @@ const TeacherDashboard: React.FC = () => {
       {/* Results Section */}
       <div>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">최근 응시 결과 (이 브라우저 전용)</h2>
+          <h2 className="text-2xl font-bold text-gray-800">최근 응시 결과 (이 브라우저)</h2>
           <button 
             onClick={clearData}
             className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
@@ -251,7 +243,7 @@ const TeacherDashboard: React.FC = () => {
         <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
           {results.length === 0 ? (
             <div className="p-12 text-center text-gray-500">
-              <p>이 기기에서 응시된 기록이 없습니다.</p>
+              <p>응시된 기록이 없습니다.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
