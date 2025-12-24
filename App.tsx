@@ -111,7 +111,7 @@ function App() {
   const handleStartQuiz = async (name: string, className: string, testDate: string) => {
     setSession({ name, className, testDate });
     setIsLoading(true);
-    setLoadingMessage(`구글 시트 '${className}' 반 데이터에 연결 중...`);
+    setLoadingMessage(`단어 데이터를 불러오는 중...`);
     setIsReviewMode(false);
     setSubmissionStatus('idle');
     
@@ -124,15 +124,16 @@ function App() {
       const sheetWords = await fetchWordsFromSheet(sheetId, className);
       
       const count = Math.min(sheetWords.length, 50);
-      setLoadingMessage(`${className} 반의 단어 ${count}개를 무작위로 추출하여 시험지를 생성 중입니다...`);
+      setLoadingMessage(`시험지를 생성 중입니다...`);
 
+      // generateQuizQuestions will now handle API failures internally and fallback to local generation
       const generatedQuestions = await generateQuizQuestions(testDate, sheetWords);
       
       setQuestions(generatedQuestions);
       setCurrentView(AppView.QUIZ);
 
     } catch (error: any) {
-      alert(`오류 발생: ${error.message}\n\n시트 ID와 수업반 명칭(탭 이름)을 확인하고, 시트가 '공개' 상태인지 확인해주세요.`);
+      alert(`문제가 발생했습니다: ${error.message}\n\n설정(시트 ID, 탭 이름)을 확인해주세요.`);
       console.error(error);
       setSession(null);
     } finally {
@@ -236,7 +237,7 @@ function App() {
           <div className="flex flex-col items-center justify-center h-96 animate-pop text-center">
              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
              <p className="text-lg text-gray-600 font-semibold px-4">{loadingMessage}</p>
-             <p className="text-sm text-gray-400 mt-2">AI가 시험지를 준비하고 있습니다...</p>
+             <p className="text-sm text-gray-400 mt-2">안정적인 시험 환경을 구성하고 있습니다...</p>
           </div>
         ) : (
           <>
