@@ -1,0 +1,5 @@
+{
+  "name": "VocaMaster AI",
+  "description": "A smart vocabulary testing platform that simulates daily curriculum from Google Sheets using Gemini AI. Features student self-testing, instant feedback, and a teacher dashboard.",
+  "requestFramePermissions": []
+}

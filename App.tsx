@@ -1,0 +1,323 @@
+import React, { useState, useEffect } from 'react';
+import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types';
+import Landing from './views/Landing';
+import Quiz from './views/Quiz';
+import Result from './views/Result';
+import TeacherDashboard from './views/TeacherDashboard';
+import IncorrectNote from './views/IncorrectNote';
+import { generateQuizQuestions } from './services/geminiService';
+import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
+
+const RESULT_STORAGE_KEY = 'vocamaster_results';
+const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
+const SHEET_ID_KEY = 'vocamaster_sheet_id';
+const SCRIPT_URL_KEY = 'vocamaster_script_url';
+
+function App() {
+  const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
+  const [session, setSession] = useState<UserSession | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [lastResult, setLastResult] = useState<QuizResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  
+  const [isReviewMode, setIsReviewMode] = useState(false);
+  const [incorrectRecords, setIncorrectRecords] = useState<Record<string, IncorrectWord[]>>({});
+
+  // Login State
+  const [accessCode, setAccessCode] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    const stored = localStorage.getItem(INCORRECT_STORAGE_KEY);
+    if (stored) {
+      try {
+        setIncorrectRecords(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to load incorrect records");
+      }
+    }
+  }, []);
+
+  const saveResult = (result: QuizResult) => {
+    // 1. Save locally
+    const existing = localStorage.getItem(RESULT_STORAGE_KEY);
+    const results: QuizResult[] = existing ? JSON.parse(existing) : [];
+    results.push(result);
+    localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
+    setLastResult(result);
+
+    // 2. Try to auto-submit to Sheet
+    const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
+    if (scriptUrl) {
+      setSubmissionStatus('submitting');
+      submitResultToSheet(scriptUrl, result).then(success => {
+        setSubmissionStatus(success ? 'success' : 'error');
+      });
+    } else {
+      setSubmissionStatus('idle');
+    }
+  };
+
+  const updateIncorrectWords = (studentName: string, quizQuestions: Question[], wrongQuestions: Question[]) => {
+    const records = { ...incorrectRecords };
+    let studentKey = Object.keys(records).find(k => k.toLowerCase() === studentName.toLowerCase().trim());
+    
+    if (!studentKey) {
+      studentKey = studentName.trim();
+      records[studentKey] = [];
+    }
+
+    const studentWords = records[studentKey];
+    const now = new Date().toISOString();
+
+    if (isReviewMode) {
+      const wrongIds = new Set(wrongQuestions.map(q => q.id));
+      const correctIds = quizQuestions.filter(q => !wrongIds.has(q.id)).map(q => q.id);
+      
+      records[studentKey] = studentWords.map(w => {
+         if (correctIds.includes(w.question.id)) {
+           return { ...w, wrongCount: w.wrongCount - 1 };
+         }
+         return w;
+      }).filter(w => w.wrongCount > 0);
+      
+      records[studentKey] = records[studentKey].map(w => {
+        if (wrongIds.has(w.question.id)) {
+           return { ...w, wrongCount: w.wrongCount + 1, lastMissedDate: now };
+        }
+        return w;
+      });
+
+    } else {
+      wrongQuestions.forEach(q => {
+        const existingIndex = studentWords.findIndex(w => w.question.word === q.word);
+        if (existingIndex >= 0) {
+          studentWords[existingIndex].wrongCount += 1;
+          studentWords[existingIndex].lastMissedDate = now;
+          studentWords[existingIndex].question = q; 
+        } else {
+          studentWords.push({
+            question: q,
+            wrongCount: 1,
+            lastMissedDate: now
+          });
+        }
+      });
+    }
+
+    setIncorrectRecords(records);
+    localStorage.setItem(INCORRECT_STORAGE_KEY, JSON.stringify(records));
+  };
+
+  const handleStartQuiz = async (name: string, tabName: string) => {
+    setSession({ name, date: tabName });
+    setIsLoading(true);
+    setLoadingMessage(`Connecting to Google Sheet Tab: '${tabName}'...`);
+    setIsReviewMode(false);
+    setSubmissionStatus('idle');
+    
+    try {
+      // 1. Get Sheet ID
+      const sheetId = localStorage.getItem(SHEET_ID_KEY);
+      if (!sheetId) {
+        throw new Error("Teacher has not configured the Google Sheet ID yet.");
+      }
+
+      // 2. Fetch Words from Sheet
+      const sheetWords = await fetchWordsFromSheet(sheetId, tabName);
+      
+      const count = Math.min(sheetWords.length, 50);
+      setLoadingMessage(`Preparing test with ${count} random words from ${sheetWords.length} found...`);
+
+      // 3. Generate Distractors via Gemini (it will shuffle and pick 50)
+      const generatedQuestions = await generateQuizQuestions(tabName, sheetWords);
+      
+      setQuestions(generatedQuestions);
+      setCurrentView(AppView.QUIZ);
+
+    } catch (error: any) {
+      alert(`Error: ${error.message}\n\nPlease check the Sheet ID and Tab Name. Ensure the sheet is 'Published to Web'.`);
+      console.error(error);
+      setSession(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartReview = (reviewQuestions: Question[], studentName?: string) => {
+    if (studentName) {
+      setSession({ name: studentName, date: 'Review' });
+    }
+    setQuestions(reviewQuestions);
+    setIsReviewMode(true);
+    setCurrentView(AppView.QUIZ);
+  };
+
+  const handleQuizComplete = (score: number, total: number, timeSeconds: number, wrongQuestions: Question[]) => {
+    if (!session && !isReviewMode) return;
+    
+    const nameToUse = session?.name || "Unknown Student";
+    
+    updateIncorrectWords(nameToUse, questions, wrongQuestions);
+
+    const result: QuizResult = {
+      studentName: nameToUse,
+      date: session?.date || "Review Mode",
+      score,
+      totalQuestions: total,
+      timeTakenSeconds: timeSeconds,
+      timestamp: new Date().toISOString(),
+    };
+    
+    if (!isReviewMode) {
+      saveResult(result);
+    } else {
+      setLastResult(result);
+    }
+    
+    setCurrentView(AppView.RESULT);
+  };
+
+  const handleLogin = () => {
+    if (accessCode === 'teacher') {
+      setLoginError('');
+      setAccessCode('');
+      setCurrentView(AppView.TEACHER_DASHBOARD);
+    } else {
+      setLoginError('Invalid access code. Try "teacher".');
+    }
+  };
+
+  const handleLogout = () => {
+    setSession(null);
+    setQuestions([]);
+    setLastResult(null);
+    setIsReviewMode(false);
+    setCurrentView(AppView.LANDING);
+    setAccessCode('');
+    setLoginError('');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div 
+            className="flex items-center gap-2 cursor-pointer" 
+            onClick={() => setCurrentView(AppView.LANDING)}
+          >
+            <div className="bg-indigo-600 text-white p-2 rounded-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">VocaMaster</h1>
+          </div>
+          
+          {currentView === AppView.LANDING && (
+             <div className="flex gap-4">
+                <button 
+                  onClick={() => setCurrentView(AppView.TEACHER_LOGIN)}
+                  className="text-sm text-gray-500 hover:text-indigo-600 font-medium transition-colors"
+                >
+                  Teacher Access
+                </button>
+             </div>
+          )}
+          {(currentView === AppView.TEACHER_DASHBOARD || currentView === AppView.INCORRECT_NOTE) && (
+             <button 
+               onClick={handleLogout}
+               className="text-sm text-gray-500 hover:text-red-600 font-medium transition-colors"
+             >
+               Close
+             </button>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-96 animate-pop">
+             <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
+             <p className="text-lg text-gray-600 font-medium">{loadingMessage}</p>
+             <p className="text-sm text-gray-400 mt-2">Connecting to Google Sheet...</p>
+          </div>
+        ) : (
+          <>
+            {currentView === AppView.LANDING && (
+              <Landing 
+                onStart={handleStartQuiz} 
+                onChangeView={setCurrentView}
+              />
+            )}
+            
+            {currentView === AppView.QUIZ && (
+              <Quiz 
+                questions={questions} 
+                onComplete={handleQuizComplete} 
+              />
+            )}
+
+            {currentView === AppView.RESULT && lastResult && (
+              <Result 
+                result={lastResult} 
+                onHome={handleLogout} 
+                submissionStatus={submissionStatus}
+              />
+            )}
+
+            {currentView === AppView.INCORRECT_NOTE && (
+              <IncorrectNote 
+                initialStudentName={session?.name}
+                incorrectRecords={incorrectRecords}
+                onStartReview={(qs, name) => handleStartReview(qs, name)}
+                onBack={() => setCurrentView(AppView.LANDING)}
+              />
+            )}
+
+            {currentView === AppView.TEACHER_LOGIN && (
+              <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-pop">
+                <h2 className="text-2xl font-bold mb-6 text-center">Teacher Login</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Access Code</label>
+                    <input 
+                      type="password" 
+                      value={accessCode}
+                      onChange={(e) => setAccessCode(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      placeholder="Enter code"
+                    />
+                    {loginError && <p className="text-red-500 text-sm mt-1">{loginError}</p>}
+                    <p className="text-gray-400 text-xs mt-2 text-right">Default code: <code>teacher</code></p>
+                  </div>
+                  <button 
+                    onClick={handleLogin}
+                    className="w-full bg-gray-900 text-white py-2 rounded-lg hover:bg-black transition-colors"
+                  >
+                    Enter Dashboard
+                  </button>
+                  <button 
+                    onClick={() => setCurrentView(AppView.LANDING)}
+                    className="w-full text-gray-500 py-2 text-sm hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {currentView === AppView.TEACHER_DASHBOARD && (
+              <TeacherDashboard />
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;
