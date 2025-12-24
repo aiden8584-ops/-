@@ -44,29 +44,23 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     }
 
     if (urlScript) {
-      // Determine if it's a plain URL or base64 encoded
       const cleanScript = urlScript.trim();
       if (cleanScript.toLowerCase().startsWith('http')) {
-        // Plain text URL
         localStorage.setItem(SCRIPT_KEY, cleanScript);
       } else {
-        // Try decoding
         try {
           const decoded = atob(cleanScript);
           localStorage.setItem(SCRIPT_KEY, decoded);
         } catch (e) {
-          // If decoding fails, fallback to using it as is if it looks vaguely valid, otherwise ignore
           console.warn("Invalid script url param, saving as is");
           localStorage.setItem(SCRIPT_KEY, cleanScript);
         }
       }
     }
     
-    // Clean URL if parameters existed
     if (urlSheetId || urlScript) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
-
   }, []);
 
   const loadTabs = async (id: string) => {
@@ -75,10 +69,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       const tabs = await fetchSheetTabs(id);
       if (tabs.length > 0) {
         setAvailableTabs(tabs);
-        setTabName(tabs[0]); // Default to first tab
+        setTabName(tabs[0]); 
         setUseDropdown(true);
       } else {
-        // Fallback to manual input if API fails or returns no tabs
         setUseDropdown(false);
         setManualMode('date');
       }
@@ -102,53 +95,48 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pop pb-10">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden border border-indigo-50">
         <div className="bg-indigo-600 p-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-2">VocaMaster</h2>
-          <p className="text-indigo-100">Teacher-Led Vocabulary Test</p>
+          <h2 className="text-3xl font-bold text-white mb-2">PIF영어학원 단어시험</h2>
+          <p className="text-indigo-100 font-medium">단어 알면 해석된다!</p>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           {!hasSheetId && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div className="text-sm text-yellow-800">
-                <p className="font-bold">Setup Required</p>
-                <p>Teacher needs to set the <strong>Google Sheet ID</strong> in the dashboard first, or use the invite link provided by your teacher.</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-5 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="text-sm text-amber-900">
+                  <p className="font-bold text-base mb-1">설정 필요</p>
+                  <p>구글 시트 연동이 아직 완료되지 않았습니다.</p>
+                </div>
               </div>
+              <Button 
+                type="button"
+                variant="secondary"
+                fullWidth
+                onClick={() => onChangeView(AppView.TEACHER_LOGIN)}
+                className="bg-white border-amber-300 text-amber-800 hover:bg-amber-50 mt-1"
+              >
+                선생님 로그인하여 설정하기
+              </Button>
             </div>
           )}
 
           <div>
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex flex-col mb-2">
               <label htmlFor="tabName" className="block text-sm font-semibold text-gray-700">
-                Select Test Date (Sheet Tab)
+                시험일 선택
               </label>
-              {!useDropdown && hasSheetId && !isLoadingTabs && (
-                <div className="flex gap-2 text-xs">
-                  <button 
-                    type="button"
-                    onClick={() => setManualMode(manualMode === 'date' ? 'text' : 'date')}
-                    className="text-indigo-600 hover:text-indigo-800 underline"
-                  >
-                    Use {manualMode === 'date' ? 'Text Input' : 'Date Picker'}
-                  </button>
-                  <span className="text-gray-300">|</span>
-                  <button 
-                    type="button" 
-                    onClick={() => loadTabs(sheetId)}
-                    className="text-indigo-600 hover:text-indigo-800 underline"
-                  >
-                    Retry List
-                  </button>
-                </div>
-              )}
+              <p className="text-[11px] text-indigo-500 font-medium">
+                (재시험자는 원래 수업이 진행된 날짜를 선택)
+              </p>
             </div>
             
             {isLoadingTabs ? (
               <div className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50 text-gray-500 text-sm flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-gray-400 border-t-indigo-600 rounded-full animate-spin"></div>
-                Loading tabs from sheet...
+                시트에서 날짜 목록을 불러오는 중...
               </div>
             ) : useDropdown && availableTabs.length > 0 ? (
               <div className="relative">
@@ -174,16 +162,25 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                   type={manualMode}
                   id="tabName"
                   required
-                  placeholder={manualMode === 'text' ? "Ex: Day1, 05-01, Week3..." : ""}
+                  placeholder={manualMode === 'text' ? "예: Day1, 05-01..." : ""}
                   value={tabName}
                   onChange={(e) => setTabName(e.target.value)}
                   disabled={!hasSheetId}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
                 {!isLoadingTabs && hasSheetId && (
-                   <p className="text-xs text-orange-500 mt-1">
-                     *Could not auto-load tabs. {manualMode === 'date' ? 'Select the date from calendar.' : 'Type the exact tab name.'}
-                   </p>
+                   <div className="flex justify-between items-center mt-1">
+                      <p className="text-[11px] text-orange-500">
+                        {manualMode === 'date' ? '달력에서 날짜를 선택하세요.' : '정확한 탭 이름을 입력하세요.'}
+                      </p>
+                      <button 
+                        type="button"
+                        onClick={() => setManualMode(manualMode === 'date' ? 'text' : 'date')}
+                        className="text-[10px] text-indigo-600 underline"
+                      >
+                        입력 방식 변경
+                      </button>
+                   </div>
                 )}
               </div>
             )}
@@ -191,13 +188,13 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
           <div>
             <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
-              Student Name
+              학생 이름
             </label>
             <input
               type="text"
               id="name"
               required
-              placeholder="Ex: John Doe"
+              placeholder="차은우"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={!hasSheetId}
@@ -206,7 +203,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           </div>
 
           <Button type="submit" fullWidth disabled={!hasSheetId} className="text-lg py-3 shadow-indigo-200">
-            Start Test
+            {hasSheetId ? '시험 시작' : '설정 대기 중'}
           </Button>
         </form>
       </div>
@@ -216,12 +213,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           variant="secondary" 
           fullWidth 
           onClick={() => onChangeView(AppView.INCORRECT_NOTE)}
-          className="flex items-center justify-center gap-2"
+          className="flex items-center justify-center gap-2 border-red-100 bg-red-50 text-red-700 hover:bg-red-100"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-red-500">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
-          Open Incorrect Answer Note
+          틀린 단어 복습하기
         </Button>
       </div>
     </div>

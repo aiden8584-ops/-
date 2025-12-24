@@ -41,14 +41,12 @@ function App() {
   }, []);
 
   const saveResult = (result: QuizResult) => {
-    // 1. Save locally
     const existing = localStorage.getItem(RESULT_STORAGE_KEY);
     const results: QuizResult[] = existing ? JSON.parse(existing) : [];
     results.push(result);
     localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
     setLastResult(result);
 
-    // 2. Try to auto-submit to Sheet
     const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
     if (scriptUrl) {
       setSubmissionStatus('submitting');
@@ -78,7 +76,7 @@ function App() {
       
       records[studentKey] = studentWords.map(w => {
          if (correctIds.includes(w.question.id)) {
-           return { ...w, wrongCount: w.wrongCount - 1 };
+           return { ...w, wrongCount: Math.max(0, w.wrongCount - 1) };
          }
          return w;
       }).filter(w => w.wrongCount > 0);
@@ -89,7 +87,6 @@ function App() {
         }
         return w;
       });
-
     } else {
       wrongQuestions.forEach(q => {
         const existingIndex = studentWords.findIndex(w => w.question.word === q.word);
@@ -114,31 +111,28 @@ function App() {
   const handleStartQuiz = async (name: string, tabName: string) => {
     setSession({ name, date: tabName });
     setIsLoading(true);
-    setLoadingMessage(`Connecting to Google Sheet Tab: '${tabName}'...`);
+    setLoadingMessage(`구글 시트 '${tabName}' 탭에 연결 중...`);
     setIsReviewMode(false);
     setSubmissionStatus('idle');
     
     try {
-      // 1. Get Sheet ID
       const sheetId = localStorage.getItem(SHEET_ID_KEY);
       if (!sheetId) {
-        throw new Error("Teacher has not configured the Google Sheet ID yet.");
+        throw new Error("선생님 설정이 완료되지 않았습니다. 시트 ID를 입력해주세요.");
       }
 
-      // 2. Fetch Words from Sheet
       const sheetWords = await fetchWordsFromSheet(sheetId, tabName);
       
       const count = Math.min(sheetWords.length, 50);
-      setLoadingMessage(`Preparing test with ${count} random words from ${sheetWords.length} found...`);
+      setLoadingMessage(`${count}개의 단어를 무작위로 추출하여 시험지를 생성 중입니다...`);
 
-      // 3. Generate Distractors via Gemini (it will shuffle and pick 50)
       const generatedQuestions = await generateQuizQuestions(tabName, sheetWords);
       
       setQuestions(generatedQuestions);
       setCurrentView(AppView.QUIZ);
 
     } catch (error: any) {
-      alert(`Error: ${error.message}\n\nPlease check the Sheet ID and Tab Name. Ensure the sheet is 'Published to Web'.`);
+      alert(`오류 발생: ${error.message}\n\n시트 ID와 탭 이름을 확인하고, 시트가 '웹에 게시' 상태인지 확인해주세요.`);
       console.error(error);
       setSession(null);
     } finally {
@@ -148,7 +142,7 @@ function App() {
 
   const handleStartReview = (reviewQuestions: Question[], studentName?: string) => {
     if (studentName) {
-      setSession({ name: studentName, date: 'Review' });
+      setSession({ name: studentName, date: '오답 복습' });
     }
     setQuestions(reviewQuestions);
     setIsReviewMode(true);
@@ -158,13 +152,12 @@ function App() {
   const handleQuizComplete = (score: number, total: number, timeSeconds: number, wrongQuestions: Question[]) => {
     if (!session && !isReviewMode) return;
     
-    const nameToUse = session?.name || "Unknown Student";
-    
+    const nameToUse = session?.name || "익명 학생";
     updateIncorrectWords(nameToUse, questions, wrongQuestions);
 
     const result: QuizResult = {
       studentName: nameToUse,
-      date: session?.date || "Review Mode",
+      date: session?.date || "복습 모드",
       score,
       totalQuestions: total,
       timeTakenSeconds: timeSeconds,
@@ -186,7 +179,7 @@ function App() {
       setAccessCode('');
       setCurrentView(AppView.TEACHER_DASHBOARD);
     } else {
-      setLoginError('Invalid access code. Try "teacher".');
+      setLoginError('비밀번호가 틀렸습니다. (기본: teacher)');
     }
   };
 
@@ -213,25 +206,25 @@ function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">VocaMaster</h1>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">PIF영어학원 단어시험</h1>
           </div>
           
           {currentView === AppView.LANDING && (
              <div className="flex gap-4">
                 <button 
                   onClick={() => setCurrentView(AppView.TEACHER_LOGIN)}
-                  className="text-sm text-gray-500 hover:text-indigo-600 font-medium transition-colors"
+                  className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors"
                 >
-                  Teacher Access
+                  선생님 로그인
                 </button>
              </div>
           )}
-          {(currentView === AppView.TEACHER_DASHBOARD || currentView === AppView.INCORRECT_NOTE) && (
+          {(currentView === AppView.TEACHER_DASHBOARD || currentView === AppView.INCORRECT_NOTE || currentView === AppView.TEACHER_LOGIN) && (
              <button 
                onClick={handleLogout}
                className="text-sm text-gray-500 hover:text-red-600 font-medium transition-colors"
              >
-               Close
+               닫기
              </button>
           )}
         </div>
@@ -239,10 +232,10 @@ function App() {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-96 animate-pop">
+          <div className="flex flex-col items-center justify-center h-96 animate-pop text-center">
              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
-             <p className="text-lg text-gray-600 font-medium">{loadingMessage}</p>
-             <p className="text-sm text-gray-400 mt-2">Connecting to Google Sheet...</p>
+             <p className="text-lg text-gray-600 font-semibold px-4">{loadingMessage}</p>
+             <p className="text-sm text-gray-400 mt-2">잠시만 기다려 주세요...</p>
           </div>
         ) : (
           <>
@@ -279,32 +272,32 @@ function App() {
 
             {currentView === AppView.TEACHER_LOGIN && (
               <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-pop">
-                <h2 className="text-2xl font-bold mb-6 text-center">Teacher Login</h2>
+                <h2 className="text-2xl font-bold mb-6 text-center">선생님 로그인</h2>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Access Code</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">액세스 코드</label>
                     <input 
                       type="password" 
                       value={accessCode}
                       onChange={(e) => setAccessCode(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                      placeholder="Enter code"
+                      placeholder="비밀번호 입력"
                     />
                     {loginError && <p className="text-red-500 text-sm mt-1">{loginError}</p>}
-                    <p className="text-gray-400 text-xs mt-2 text-right">Default code: <code>teacher</code></p>
+                    <p className="text-gray-400 text-xs mt-2 text-right">기본 코드: <code>teacher</code></p>
                   </div>
                   <button 
                     onClick={handleLogin}
                     className="w-full bg-gray-900 text-white py-2 rounded-lg hover:bg-black transition-colors"
                   >
-                    Enter Dashboard
+                    대시보드 입장
                   </button>
                   <button 
                     onClick={() => setCurrentView(AppView.LANDING)}
                     className="w-full text-gray-500 py-2 text-sm hover:text-gray-700"
                   >
-                    Cancel
+                    취소
                   </button>
                 </div>
               </div>
