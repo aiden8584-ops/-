@@ -23,7 +23,6 @@ const TeacherDashboard: React.FC = () => {
   const [qrError, setQrError] = useState(false);
 
   useEffect(() => {
-    // 1. Load Results
     const storedResults = localStorage.getItem(STORAGE_KEY);
     if (storedResults) {
       try {
@@ -35,7 +34,6 @@ const TeacherDashboard: React.FC = () => {
       }
     }
 
-    // 2. Load Persisted Configs
     const storedSheetId = localStorage.getItem(SHEET_ID_KEY);
     const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
     const storedBaseUrl = localStorage.getItem(BASE_URL_KEY);
@@ -46,13 +44,18 @@ const TeacherDashboard: React.FC = () => {
     }
     if (storedScriptUrl) setScriptUrl(storedScriptUrl);
     
+    // Auto-detect current URL if none stored
     if (storedBaseUrl) {
       setBaseUrl(storedBaseUrl);
     } else {
-      const currentHref = window.location.origin + window.location.pathname;
-      setBaseUrl(currentHref);
+      autoDetectUrl();
     }
   }, []);
+
+  const autoDetectUrl = () => {
+    const currentHref = window.location.origin + window.location.pathname;
+    setBaseUrl(currentHref);
+  };
 
   const loadTabs = async (id: string) => {
     if (!id) return;
@@ -92,7 +95,6 @@ const TeacherDashboard: React.FC = () => {
     }, 500);
   };
 
-  // Stable shareUrl generation
   const shareUrl = useMemo(() => {
     if (!sheetId) return "";
     const params = new URLSearchParams();
@@ -108,13 +110,11 @@ const TeacherDashboard: React.FC = () => {
     return `${cleanBase}${connector}${qs}`;
   }, [sheetId, scriptUrl, selectedClass, baseUrl]);
 
-  // Stable QR URL generation
   const qrUrl = useMemo(() => {
     if (!shareUrl) return "";
     return `https://quickchart.io/qr?text=${encodeURIComponent(shareUrl)}&size=400&margin=2&ecLevel=H`;
   }, [shareUrl]);
 
-  // Handle QR loading state
   useEffect(() => {
     if (qrUrl) {
       setQrLoading(true);
@@ -141,7 +141,10 @@ const TeacherDashboard: React.FC = () => {
     }
   };
 
-  const isDevelopmentUrl = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('aistudio.google.com');
+  const isInvalidUrl = useMemo(() => {
+    const lower = baseUrl.toLowerCase();
+    return lower.includes('vercel.com') && !lower.includes('vercel.app');
+  }, [baseUrl]);
 
   return (
     <div className="animate-pop space-y-8 pb-20">
@@ -162,7 +165,7 @@ const TeacherDashboard: React.FC = () => {
                 value={sheetId}
                 onChange={(e) => setSheetId(e.target.value)}
                 className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-mono text-sm transition-all"
-                placeholder="시트 ID"
+                placeholder="시트 ID 입력"
               />
             </div>
             <div>
@@ -172,23 +175,41 @@ const TeacherDashboard: React.FC = () => {
                 value={scriptUrl}
                 onChange={(e) => setScriptUrl(e.target.value)}
                 className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-mono text-sm transition-all"
-                placeholder="https://..."
+                placeholder="결과 전송용 URL"
               />
             </div>
           </div>
 
-          <div className="bg-amber-50 p-6 rounded-2xl border-2 border-amber-100">
-            <label className="block text-sm font-black text-amber-800 mb-1 uppercase tracking-tighter">학생 접속 주소 (Base URL)</label>
+          <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-200">
+            <div className="flex justify-between items-end mb-2">
+              <label className="block text-sm font-black text-amber-900 uppercase tracking-tighter">학생 접속 주소 (Base URL)</label>
+              <button 
+                type="button" 
+                onClick={autoDetectUrl}
+                className="text-[10px] bg-amber-200 hover:bg-amber-300 text-amber-900 px-2 py-1 rounded-md font-bold transition-colors"
+              >
+                현재 주소로 자동 설정
+              </button>
+            </div>
             <input 
               type="text" 
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
-              className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 focus:ring-amber-200 outline-none font-mono text-sm ${isDevelopmentUrl ? 'border-amber-300 bg-white' : 'border-gray-100 bg-white'}`}
-              placeholder="https://..."
+              className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-4 outline-none font-mono text-sm ${isInvalidUrl ? 'border-red-400 bg-red-50 text-red-900' : 'border-amber-200 bg-white'}`}
+              placeholder="https://your-site.vercel.app"
             />
+            {isInvalidUrl && (
+              <p className="mt-2 text-xs text-red-600 font-black animate-shake">
+                ⚠️ 경고: 주소가 vercel.com으로 설정되어 있습니다. <br/>
+                학생들이 접속할 수 있도록 실제 배포된 주소(예: .vercel.app)를 입력해 주세요.
+              </p>
+            )}
+            <p className="mt-2 text-[10px] text-amber-700 font-medium">
+              * 학생들이 이 QR을 찍었을 때 도착할 웹사이트 주소입니다.
+            </p>
           </div>
 
-          <Button onClick={handleSaveConfig} fullWidth disabled={isSaving} className={`py-4 shadow-xl transition-all ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
+          <Button onClick={handleSaveConfig} fullWidth disabled={isSaving || isInvalidUrl} className={`py-4 shadow-xl transition-all ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
             {isSaving ? '저장 중...' : (isSaved ? '✅ 설정 저장 완료' : '설정 저장하기')}
           </Button>
 
@@ -231,7 +252,6 @@ const TeacherDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* QR SECTION - ALWAYS VISIBLE */}
                   <div className="flex flex-col items-center justify-center p-8 bg-gray-50 border-4 border-dotted border-gray-200 rounded-[3rem] animate-pop relative min-h-[460px]">
                     {qrLoading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10 rounded-[3rem]">
@@ -264,7 +284,7 @@ const TeacherDashboard: React.FC = () => {
                         {selectedClass ? `[${selectedClass}] 반` : '전체 학생'} 단어시험
                       </p>
                       <p className="text-sm font-bold text-indigo-600 mt-1">이 QR 코드를 빔 프로젝터로 띄워주세요.</p>
-                      {!selectedClass && <p className="text-[11px] text-gray-400 mt-2 font-medium">※ 반을 선택하면 학생들이 더 빠르게 시험을 시작할 수 있습니다.</p>}
+                      {isInvalidUrl && <p className="text-[11px] text-red-500 font-black mt-2">※ 주소 설정 오류로 인해 접속이 안 될 수 있습니다.</p>}
                     </div>
                   </div>
                </div>

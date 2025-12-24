@@ -11,14 +11,14 @@ interface LandingProps {
 const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   const [name, setName] = useState('');
   const [className, setClassName] = useState('');
-  const [testDate, setTestDate] = useState(new Date().toISOString().split('T')[0]);
+  // Always default to today's date
+  const [testDate] = useState(new Date().toISOString().split('T')[0]);
   const [hasSheetId, setHasSheetId] = useState(false);
   const [isUrlInitialized, setIsUrlInitialized] = useState(false);
   
   const PRESET_TABS = ['서울고', '상문고', '서초고', '예비고1', '예비고2'];
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   const [isLoadingTabs, setIsLoadingTabs] = useState(false);
-  const [isManualInput, setIsManualInput] = useState(false);
   
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,7 +30,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const urlSheetId = params.get('sheet_id');
     const urlScript = params.get('script');
     const urlClass = params.get('class_name');
-    const urlDate = params.get('date');
 
     if (urlSheetId) {
       localStorage.setItem(SHEET_KEY, urlSheetId);
@@ -48,16 +47,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       localStorage.setItem(SCRIPT_KEY, urlScript.trim());
     }
 
-    if (urlClass) setClassName(urlClass);
-    if (urlDate) setTestDate(urlDate);
-
-    // If we have class info from URL, focus name input immediately
-    if (urlClass && urlDate) {
+    if (urlClass) {
+      setClassName(urlClass);
       setIsUrlInitialized(true);
       setTimeout(() => nameInputRef.current?.focus(), 500);
     }
     
-    // Clear sensitive parameters but keep class_name locally if needed
     if (urlSheetId || urlScript) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -69,7 +64,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       const tabs = await fetchSheetTabs(id);
       if (tabs && tabs.length > 0) {
         setAvailableTabs(tabs);
-        setIsManualInput(false);
       }
     } catch (e) {
       setAvailableTabs(PRESET_TABS);
@@ -85,17 +79,26 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     }
   };
 
+  // Format today's date for display
+  const displayDate = new Date().toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long'
+  });
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pop pb-10">
       <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-indigo-50">
         <div className="bg-indigo-600 p-10 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
           <h2 className="text-3xl font-black text-white mb-2 relative z-10 tracking-tight">PIF영어학원 단어시험</h2>
-          {isUrlInitialized ? (
-            <p className="text-indigo-100 font-bold relative z-10 text-sm">[{className}] 반 시험 준비 완료</p>
-          ) : (
-            <p className="text-indigo-100 font-bold relative z-10 text-sm">학생 스스로 측정하는 스마트 단어 테스트</p>
-          )}
+          <p className="text-indigo-100 font-bold relative z-10 text-sm">
+            {isUrlInitialized ? `[${className}] 반 시험 준비 완료` : '스마트 단어 테스트 시스템'}
+          </p>
+          <div className="mt-4 bg-indigo-500/30 inline-block px-4 py-1 rounded-full text-xs text-white font-bold backdrop-blur-sm">
+            📅 {displayDate}
+          </div>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-8">
@@ -106,52 +109,38 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
             </div>
           )}
 
-          {/* If initialized by URL, hide Class/Date selection to make it fast */}
           {!isUrlInitialized ? (
-            <>
-              <div className="animate-pop" style={{ animationDelay: '0.1s' }}>
-                <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest mb-2">Step 01. 시험 날짜</label>
-                <input
-                  type="date"
-                  required
-                  value={testDate}
-                  onChange={(e) => setTestDate(e.target.value)}
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-black text-lg"
-                />
+            <div className="animate-pop" style={{ animationDelay: '0.1s' }}>
+              <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest mb-1">Step 01. 수업반 선택</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                {availableTabs.map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setClassName(tab)}
+                    className={`px-3 py-4 rounded-2xl border-2 transition-all duration-300 text-sm font-black h-16 flex items-center justify-center text-center leading-tight
+                      ${className === tab 
+                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-xl scale-105' 
+                        : 'border-gray-50 bg-gray-50 text-gray-500 hover:border-indigo-200'}`}
+                  >
+                    {tab}
+                  </button>
+                ))}
               </div>
-
-              <div className="animate-pop" style={{ animationDelay: '0.2s' }}>
-                <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest mb-1">Step 02. 수업반 선택</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                  {availableTabs.map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setClassName(tab)}
-                      className={`px-3 py-4 rounded-2xl border-2 transition-all duration-300 text-sm font-black h-16 flex items-center justify-center text-center leading-tight
-                        ${className === tab 
-                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-xl scale-105' 
-                          : 'border-gray-50 bg-gray-50 text-gray-500 hover:border-indigo-200'}`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
+            </div>
           ) : (
             <div className="bg-indigo-50 p-6 rounded-3xl border-2 border-indigo-100 flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">배정된 시험 정보</p>
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">배정된 수업 정보</p>
                 <p className="text-xl font-black text-indigo-900">{className}</p>
-                <p className="text-xs font-bold text-indigo-500">{testDate}</p>
+                <p className="text-xs font-bold text-indigo-500">오늘의 단어로 테스트를 시작합니다.</p>
               </div>
               <button type="button" onClick={() => setIsUrlInitialized(false)} className="text-xs font-black text-indigo-600 underline">변경하기</button>
             </div>
           )}
 
-          <div className="animate-pop" style={{ animationDelay: '0.3s' }}>
-            <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest mb-2">Step 03. 학생 이름 입력</label>
+          <div className="animate-pop" style={{ animationDelay: '0.2s' }}>
+            <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest mb-2">Step 02. 학생 이름 입력</label>
             <input
               ref={nameInputRef}
               type="text"
@@ -163,7 +152,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
             />
           </div>
 
-          <div className="animate-pop pt-4" style={{ animationDelay: '0.4s' }}>
+          <div className="animate-pop pt-4" style={{ animationDelay: '0.3s' }}>
             <Button type="submit" fullWidth disabled={!className || !name} className="text-xl py-6 shadow-2xl shadow-indigo-200 rounded-[1.5rem] font-black">
               오늘의 시험 시작하기
             </Button>
