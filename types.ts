@@ -7,7 +7,8 @@ export interface Question {
 
 export interface QuizResult {
   studentName: string;
-  date: string;
+  className: string;
+  date: string; // Test Date (YYYY-MM-DD)
   score: number;
   totalQuestions: number;
   timeTakenSeconds: number;
@@ -36,7 +37,8 @@ export enum AppView {
 
 export interface UserSession {
   name: string;
-  date: string; // YYYY-MM-DD or Tab Name
+  className: string;
+  testDate: string;
 }
 
 export interface SheetWord {

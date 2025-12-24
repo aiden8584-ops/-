@@ -108,10 +108,10 @@ function App() {
     localStorage.setItem(INCORRECT_STORAGE_KEY, JSON.stringify(records));
   };
 
-  const handleStartQuiz = async (name: string, tabName: string) => {
-    setSession({ name, date: tabName });
+  const handleStartQuiz = async (name: string, className: string, testDate: string) => {
+    setSession({ name, className, testDate });
     setIsLoading(true);
-    setLoadingMessage(`구글 시트 '${tabName}' 반에 연결 중...`);
+    setLoadingMessage(`구글 시트 '${className}' 반 데이터에 연결 중...`);
     setIsReviewMode(false);
     setSubmissionStatus('idle');
     
@@ -121,18 +121,18 @@ function App() {
         throw new Error("선생님 설정이 완료되지 않았습니다. 시트 ID를 입력해주세요.");
       }
 
-      const sheetWords = await fetchWordsFromSheet(sheetId, tabName);
+      const sheetWords = await fetchWordsFromSheet(sheetId, className);
       
       const count = Math.min(sheetWords.length, 50);
-      setLoadingMessage(`${tabName} 반의 단어 ${count}개를 무작위로 추출하여 시험지를 생성 중입니다...`);
+      setLoadingMessage(`${className} 반의 단어 ${count}개를 무작위로 추출하여 시험지를 생성 중입니다...`);
 
-      const generatedQuestions = await generateQuizQuestions(tabName, sheetWords);
+      const generatedQuestions = await generateQuizQuestions(testDate, sheetWords);
       
       setQuestions(generatedQuestions);
       setCurrentView(AppView.QUIZ);
 
     } catch (error: any) {
-      alert(`오류 발생: ${error.message}\n\n시트 ID와 수업반 명칭(탭 이름)을 확인하고, 시트가 '웹에 게시' 상태인지 확인해주세요.`);
+      alert(`오류 발생: ${error.message}\n\n시트 ID와 수업반 명칭(탭 이름)을 확인하고, 시트가 '공개' 상태인지 확인해주세요.`);
       console.error(error);
       setSession(null);
     } finally {
@@ -142,7 +142,7 @@ function App() {
 
   const handleStartReview = (reviewQuestions: Question[], studentName?: string) => {
     if (studentName) {
-      setSession({ name: studentName, date: '오답 복습' });
+      setSession({ name: studentName, className: '오답 복습', testDate: new Date().toISOString().split('T')[0] });
     }
     setQuestions(reviewQuestions);
     setIsReviewMode(true);
@@ -157,7 +157,8 @@ function App() {
 
     const result: QuizResult = {
       studentName: nameToUse,
-      date: session?.date || "복습 모드",
+      className: session?.className || "복습 모드",
+      date: session?.testDate || new Date().toISOString().split('T')[0],
       score,
       totalQuestions: total,
       timeTakenSeconds: timeSeconds,
@@ -206,7 +207,7 @@ function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">PIF영어학원 단어시험</h1>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">PIF영어학원</h1>
           </div>
           
           {currentView === AppView.LANDING && (
@@ -215,7 +216,7 @@ function App() {
                   onClick={() => setCurrentView(AppView.TEACHER_LOGIN)}
                   className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors"
                 >
-                  선생님 로그인
+                  선생님
                 </button>
              </div>
           )}
@@ -235,7 +236,7 @@ function App() {
           <div className="flex flex-col items-center justify-center h-96 animate-pop text-center">
              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
              <p className="text-lg text-gray-600 font-semibold px-4">{loadingMessage}</p>
-             <p className="text-sm text-gray-400 mt-2">잠시만 기다려 주세요...</p>
+             <p className="text-sm text-gray-400 mt-2">AI가 시험지를 준비하고 있습니다...</p>
           </div>
         ) : (
           <>
@@ -285,7 +286,6 @@ function App() {
                       placeholder="비밀번호 입력"
                     />
                     {loginError && <p className="text-red-500 text-sm mt-1">{loginError}</p>}
-                    <p className="text-gray-400 text-xs mt-2 text-right">기본 코드: <code>teacher</code></p>
                   </div>
                   <button 
                     onClick={handleLogin}
