@@ -1,139 +1,169 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
-import { QuizResult, IncorrectWord } from '../types';
-import Button from '../components/Button';
-import { fetchSheetTabs } from '../services/sheetService';
+import Button from '../components/Button.tsx';
+import { fetchSheetTabs, checkSheetAvailability } from '../services/sheetService.ts';
 
-const STORAGE_KEY = 'vocamaster_results';
-const INCORRECT_KEY = 'vocamaster_incorrect_notes';
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
-type DashboardTab = 'status' | 'students' | 'settings';
+const GAS_CODE_SNIPPET = `/**
+ * ---------------------------------------------------------
+ * [VocaMaster 단어시험 채점 시스템]
+ * 1. 이 코드를 복사해서 기존 내용을 모두 지우고 붙여넣으세요.
+ * 2. 저장(디스켓 아이콘) 후 [배포] > [새 배포]를 누르세요.
+ * 3. 톱니바퀴 > [웹 앱] 선택
+ * 4. 설명: VocaMaster (입력 안 해도 됨)
+ * 5. 액세스 권한: "모든 사용자" (★중요! 꼭 '모든 사용자'여야 합니다★)
+ * 6. [배포] 클릭 -> [승인] -> URL 복사
+ * ---------------------------------------------------------
+ */
 
-// Extension for window.aistudio
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    // Fix: Remove readonly to match environment's global declaration and avoid "identical modifiers" error
-    aistudio: AIStudio;
-  }
+function doGet(e) {
+  return ContentService.createTextOutput("VocaMaster 연결 성공! (설정이 완료되었습니다)");
 }
 
+function doPost(e) {
+  if (typeof e === 'undefined' || !e.postData) {
+    return ContentService.createTextOutput("⚠️ 이 함수는 직접 실행하는 것이 아닙니다. 웹 앱으로 배포 후 학생이 제출하면 자동으로 실행됩니다.");
+  }
+
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetName = data.tabName || "전체결과"; 
+    var sheet = ss.getSheetByName(sheetName);
+
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(["이름", "점수", "총점", "소요시간(초)", "시험날짜", "제출일시"]);
+    }
+
+    sheet.appendRow([
+      data.studentName,
+      data.score,
+      data.total,
+      data.timeTaken,
+      data.testDate,
+      data.timestamp
+    ]);
+
+    return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+  } catch(error) {
+    return ContentService.createTextOutput("Error: " + error.toString()).setMimeType(ContentService.MimeType.TEXT);
+  }
+}`;
+
+const sanitizeInput = (val: string) => {
+  if (!val) return '';
+  let clean = val.trim();
+  clean = clean.replace(/\\$/, ''); 
+  clean = clean.replace(/googhttps?$/, '');
+  clean = clean.replace(/googhtt$/, '');
+  // Remove quotes if user pasted JSON string
+  clean = clean.replace(/^"|"$/g, '');
+  return clean;
+};
+
+const extractSheetId = (val: string) => {
+  if (!val) return '';
+  // If it's a full URL, extract ID
+  const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : val;
+};
+
 const TeacherDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('status');
-  const [results, setResults] = useState<QuizResult[]>([]);
-  const [incorrectNotes, setIncorrectNotes] = useState<Record<string, IncorrectWord[]>>({});
-  
   const [sheetId, setSheetId] = useState('');
   const [scriptUrl, setScriptUrl] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [availableTabs, setAvailableTabs] = useState<string[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
   
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'success_manual' | 'fail'>('none');
   const [isCopied, setIsCopied] = useState(false);
   
-  const [hasPaidKey, setHasPaidKey] = useState(false);
+  const [showScriptGuide, setShowScriptGuide] = useState(false);
+  const [isCodeCopied, setIsCodeCopied] = useState(false);
+  const [autoCorrected, setAutoCorrected] = useState<string | null>(null);
 
   useEffect(() => {
-    loadData();
-    const storedSheetId = localStorage.getItem(SHEET_ID_KEY);
-    const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
-    const storedBaseUrl = localStorage.getItem(BASE_URL_KEY);
+    const storedSheetId = localStorage.getItem(SHEET_ID_KEY) || '';
+    const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || '';
+    const storedBaseUrl = localStorage.getItem(BASE_URL_KEY) || '';
+
+    setSheetId(storedSheetId);
+    setScriptUrl(sanitizeInput(storedScriptUrl));
+    
+    if (storedSheetId && !storedScriptUrl) {
+      setShowScriptGuide(true);
+    }
+    
+    // Base URL Logic - Ensure protocol
+    if (storedBaseUrl) {
+      setBaseUrl(sanitizeInput(storedBaseUrl));
+    } else {
+      const detected = window.location.origin + window.location.pathname;
+      setBaseUrl(detected);
+    }
 
     if (storedSheetId) {
-      setSheetId(storedSheetId);
       loadTabs(storedSheetId);
-    }
-    if (storedScriptUrl) setScriptUrl(storedScriptUrl);
-    if (storedBaseUrl) setBaseUrl(storedBaseUrl);
-    else autoDetectUrl();
-
-    if (window.aistudio) {
-      window.aistudio.hasSelectedApiKey().then(setHasPaidKey);
     }
   }, []);
 
-  const loadData = () => {
-    const storedResults = localStorage.getItem(STORAGE_KEY);
-    if (storedResults) {
-      try {
-        const parsed = JSON.parse(storedResults) as QuizResult[];
-        parsed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        setResults(parsed);
-      } catch (e) { console.error("Results parsing error"); }
-    }
-
-    const storedNotes = localStorage.getItem(INCORRECT_KEY);
-    if (storedNotes) {
-      try {
-        setIncorrectNotes(JSON.parse(storedNotes));
-      } catch (e) { console.error("Notes parsing error"); }
-    }
-  };
-
-  const autoDetectUrl = () => {
-    const currentHref = window.location.origin + window.location.pathname;
-    setBaseUrl(currentHref);
-  };
-
   const loadTabs = async (id: string) => {
     if (!id) return;
+    setIsRefreshing(true);
     try {
       const tabs = await fetchSheetTabs(id);
-      setAvailableTabs(tabs);
-    } catch (e) { console.error("Tabs loading error"); }
-  };
-
-  const handleSaveConfig = () => {
-    setIsSaving(true);
-    let cleanId = sheetId.trim();
-    const urlMatch = cleanId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (urlMatch) cleanId = urlMatch[1];
-    
-    localStorage.setItem(SHEET_ID_KEY, cleanId);
-    setSheetId(cleanId);
-    if (scriptUrl.trim()) localStorage.setItem(SCRIPT_URL_KEY, scriptUrl.trim());
-    else localStorage.removeItem(SCRIPT_URL_KEY);
-    if (baseUrl.trim()) localStorage.setItem(BASE_URL_KEY, baseUrl.trim());
-
-    loadTabs(cleanId);
-    setTimeout(() => {
-      setIsSaving(false);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
-    }, 500);
-  };
-
-  const handleOpenPaidKeyDialog = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasPaidKey(true);
+      if (tabs.length > 0) {
+        setAvailableTabs(tabs);
+        setConnectionStatus('success');
+      } else {
+        const isAvailable = await checkSheetAvailability(id);
+        if (isAvailable) {
+           setConnectionStatus('success_manual');
+           setAvailableTabs([]);
+        } else {
+           setConnectionStatus('fail');
+        }
+      }
+    } catch (e) { 
+      console.error("Tabs loading error", e);
+      setConnectionStatus('fail');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  const students = useMemo(() => {
-    const studentMap: Record<string, { resultCount: number; incorrectCount: number }> = {};
-    
-    results.forEach(r => {
-      if (!studentMap[r.studentName]) studentMap[r.studentName] = { resultCount: 0, incorrectCount: 0 };
-      studentMap[r.studentName].resultCount++;
-    });
+  const handleSheetIdChange = (val: string) => {
+    const extracted = extractSheetId(val);
+    setSheetId(extracted);
+    localStorage.setItem(SHEET_ID_KEY, extracted);
+    setConnectionStatus('none');
+  };
 
-    Object.keys(incorrectNotes).forEach((name) => {
-      const words = incorrectNotes[name];
-      if (!studentMap[name]) studentMap[name] = { resultCount: 0, incorrectCount: 0 };
-      studentMap[name].incorrectCount = words.length;
-    });
+  const handleScriptUrlChange = (val: string) => {
+    const clean = sanitizeInput(val);
+    if (clean !== val.trim()) {
+      setAutoCorrected('Apps Script 주소의 오타를 자동으로 수정했습니다.');
+      setTimeout(() => setAutoCorrected(null), 3000);
+    }
+    setScriptUrl(clean);
+    localStorage.setItem(SCRIPT_URL_KEY, clean);
+  };
 
-    return Object.entries(studentMap).map(([name, stats]) => ({ name, ...stats }));
-  }, [results, incorrectNotes]);
+  const handleBaseUrlChange = (val: string) => {
+    const clean = sanitizeInput(val);
+    setBaseUrl(clean);
+    localStorage.setItem(BASE_URL_KEY, clean);
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(GAS_CODE_SNIPPET);
+    setIsCodeCopied(true);
+    setTimeout(() => setIsCodeCopied(false), 2000);
+  };
 
   const shareUrl = useMemo(() => {
     if (!sheetId) return "";
@@ -142,209 +172,271 @@ const TeacherDashboard: React.FC = () => {
     if (scriptUrl) params.set('script', scriptUrl.trim());
     if (selectedClass) params.set('class_name', selectedClass);
     params.set('date', new Date().toISOString().split('T')[0]);
-    const cleanBase = baseUrl.trim() || (window.location.origin + window.location.pathname);
-    const connector = cleanBase.includes('?') ? '&' : '?';
-    return `${cleanBase}${connector}${params.toString()}`;
+    
+    // URL Construction Logic (Robust)
+    let url = baseUrl.trim() || (window.location.origin + window.location.pathname);
+    
+    // Remove trailing slash to standardize
+    if (url.endsWith('/')) {
+        url = url.slice(0, -1);
+    }
+
+    // Force Protocol (Crucial for external links)
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = window.location.protocol + '//' + url;
+    }
+
+    // Add trailing slash before query params to be safe
+    return `${url}/?${params.toString()}`;
   }, [sheetId, scriptUrl, selectedClass, baseUrl]);
 
   const qrUrl = useMemo(() => {
     if (!shareUrl) return "";
-    return `https://quickchart.io/qr?text=${encodeURIComponent(shareUrl)}&size=400&margin=2&ecLevel=H`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
   }, [shareUrl]);
 
-  const isInvalidUrl = useMemo(() => {
-    const lower = baseUrl.toLowerCase();
-    return lower.includes('vercel.com') && !lower.includes('vercel.app');
-  }, [baseUrl]);
-
   return (
-    <div className="animate-pop space-y-6 pb-20">
-      <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 mb-2">
-        {(['status', 'students', 'settings'] as DashboardTab[]).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-3 px-4 rounded-xl text-sm font-black transition-all ${
-              activeTab === tab 
-              ? 'bg-indigo-600 text-white shadow-lg' 
-              : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'
-            }`}
-          >
-            {tab === 'status' && '📊 배포 현황'}
-            {tab === 'students' && '👥 학생 관리'}
-            {tab === 'settings' && '⚙️ 환경 설정'}
-          </button>
-        ))}
+    <div className="animate-pop space-y-10 pb-24">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-black text-gray-900 tracking-tight">선생님 관리 대시보드</h2>
+        <p className="text-gray-500 text-sm">학생들에게 배포할 시험 링크를 생성하고 시스템을 설정합니다.</p>
       </div>
 
-      {activeTab === 'status' && (
-        <div className="space-y-6 animate-pop">
-          {sheetId ? (
-            <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-2xl font-black text-indigo-900 mb-2">🚀 학생 시험 배포</h4>
-                    <p className="text-gray-500 text-sm">학생들에게 공유할 QR코드와 링크를 생성합니다.</p>
-                  </div>
-                  <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100">
-                    <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">수업반(탭) 선택</label>
-                    <select 
-                      value={selectedClass} 
-                      onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full px-4 py-4 border-2 border-indigo-200 rounded-2xl text-indigo-900 font-bold outline-none mb-4"
-                    >
-                      <option value="">-- 반 선택 (전체) --</option>
-                      {availableTabs.map(tab => <option key={tab} value={tab}>{tab}</option>)}
-                    </select>
-                    <div className="flex gap-2">
-                      <Button variant="secondary" size="lg" fullWidth onClick={() => {
-                        navigator.clipboard.writeText(shareUrl);
-                        setIsCopied(true);
-                        setTimeout(() => setIsCopied(false), 2000);
-                      }}>
-                        {isCopied ? '링크 복사됨!' : '시험 링크 복사'}
-                      </Button>
-                      <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-4 bg-indigo-900 text-white rounded-2xl text-sm font-bold flex items-center justify-center">열기</a>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col items-center justify-center p-8 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
-                  <img src={qrUrl} alt="QR" className="w-56 h-56 mb-4" />
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">QR코드를 학생들에게 보여주세요</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-amber-50 p-10 rounded-3xl border-2 border-amber-100 text-center">
-               <p className="font-black text-amber-900 text-xl mb-2">시트 설정이 필요합니다</p>
-               <p className="text-amber-700 mb-6 text-sm">환경 설정 탭에서 구글 시트 ID를 먼저 입력해주세요.</p>
-               <Button onClick={() => setActiveTab('settings')}>설정하러 가기</Button>
-            </div>
+      {/* 1. QR 배포 섹션 */}
+      <section className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100">
+        <div className="bg-indigo-600 px-8 py-5 flex justify-between items-center text-white">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 px-2 py-1 rounded text-xs font-bold">Step 1</span>
+            <h3 className="font-bold text-lg">학생 시험 배포 (QR 생성)</h3>
+          </div>
+          {sheetId && (
+            <button onClick={() => loadTabs(sheetId)} className="p-2 hover:bg-white/10 rounded-full transition-colors" title="새로고침">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
           )}
-          
-          <div className="bg-indigo-900 rounded-[2.5rem] p-10 text-white text-center shadow-2xl">
-            <h4 className="text-xl font-black mb-2">✅ 실시간 결과 확인 안내</h4>
-            <p className="text-indigo-200 text-sm mb-0 leading-relaxed">
-              학생들이 시험을 마치면 결과가 구글 시트의 해당 반 탭에 자동으로 저장됩니다.<br/>
-              로컬 응시 기록 섹션은 삭제되었으며, 이제 모든 성적은 선생님의 구글 시트에서 통합 관리하세요.
-            </p>
-          </div>
         </div>
-      )}
-
-      {activeTab === 'students' && (
-        <div className="animate-pop space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {students.map(student => (
-              <div key={student.name} className="bg-white p-6 rounded-3xl shadow-md border border-gray-100">
-                <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-xl mb-4">👤</div>
-                <h3 className="text-lg font-black text-gray-800 mb-1">{student.name}</h3>
-                <div className="flex gap-4 mt-4">
-                  <div>
-                    <div className="text-[10px] font-black text-gray-400 uppercase">시험 응시</div>
-                    <div className="text-xl font-black text-indigo-600">{student.resultCount}회</div>
-                  </div>
-                  <div className="border-l border-gray-100 pl-4">
-                    <div className="text-[10px] font-black text-gray-400 uppercase">오답 단어</div>
-                    <div className="text-xl font-black text-red-500">{student.incorrectCount}개</div>
+        
+        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">1. 배포할 수업반 선택</label>
+              
+              {availableTabs.length > 0 ? (
+                <div className="relative">
+                  <select 
+                    value={selectedClass} 
+                    onChange={(e) => setSelectedClass(e.target.value)} 
+                    className="w-full pl-4 pr-10 py-4 border-2 border-indigo-100 rounded-xl font-bold text-gray-700 bg-indigo-50/50 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all appearance-none outline-none"
+                  >
+                    <option value="">-- 반을 선택해주세요 --</option>
+                    {availableTabs.map(tab => <option key={tab} value={tab}>{tab}</option>)}
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
                   </div>
                 </div>
-              </div>
-            ))}
-            {students.length === 0 && (
-               <div className="col-span-full py-20 text-center text-gray-400 font-bold">
-                 아직 등록된 학생 데이터가 없습니다.
-               </div>
-            )}
-          </div>
-        </div>
-      )}
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={selectedClass}
+                    onChange={(e) => setSelectedClass(e.target.value)}
+                    placeholder="시트의 탭(반) 이름을 직접 입력하세요"
+                    className="w-full px-4 py-4 border-2 border-indigo-100 rounded-xl font-bold text-gray-700 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
+                  />
+                </div>
+              )}
 
-      {activeTab === 'settings' && (
-        <div className="animate-pop space-y-6">
-          <div className="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-3xl shadow-xl p-8 text-white">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-xl font-black mb-1">AI 사용량(Quota) 관리</h3>
-                <p className="text-indigo-200 text-sm">사용량 초과(429 에러) 발생 시 유료 프로젝트 키를 연결하세요.</p>
-              </div>
-              <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${hasPaidKey ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'}`}>
-                {hasPaidKey ? 'Paid Key Active' : 'Free Tier'}
-              </div>
+              {availableTabs.length === 0 && sheetId && (
+                <p className="text-xs text-orange-500 mt-2 font-medium">
+                  ⚠️ 시트 탭을 불러오지 못했습니다. 탭 이름을 직접 입력하거나, 시트 [공유] 설정이 '링크가 있는 모든 사용자'인지 확인하세요.
+                </p>
+              )}
             </div>
-            
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 mb-6">
-              <p className="text-sm leading-relaxed mb-4">
-                현재 "Quota Exceeded" 에러가 발생한다면 선생님의 구글 유료 프로젝트 API 키를 연동해야 합니다. 
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
+
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. 링크 공유하기</label>
+              
+              <div className="mb-2">
+                 <input 
+                   readOnly
+                   value={shareUrl || "설정 후 생성됩니다"}
+                   className="w-full text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg p-2 font-mono"
+                 />
+              </div>
+
+              <div className="flex gap-2">
                 <Button 
-                  onClick={handleOpenPaidKeyDialog} 
-                  fullWidth 
-                  className="bg-white text-indigo-900 hover:bg-indigo-50 font-black py-4"
+                    variant="secondary" 
+                    fullWidth 
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareUrl);
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    disabled={!shareUrl}
                 >
-                  {hasPaidKey ? '다른 유료 API 키로 변경' : '유료 API 키 선택하기'}
+                  {isCopied ? '✅ 복사 완료' : '🔗 링크 복사'}
                 </Button>
                 <a 
-                  href="https://ai.google.dev/gemini-api/docs/billing" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="px-6 py-4 bg-indigo-700/50 hover:bg-indigo-700 text-white rounded-xl text-center text-sm font-bold transition-all border border-indigo-500/30"
+                    href={shareUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className={`px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold flex items-center shadow-lg shadow-indigo-200 transition-all ${!shareUrl ? 'opacity-50 pointer-events-none' : 'hover:bg-indigo-700'}`}
                 >
-                  결제 등록 안내 (문서)
+                  열기
                 </a>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-xl border-2 border-indigo-50 p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black text-indigo-900">시스템 설정</h3>
-              {isSaved && <span className="text-green-600 font-bold text-sm animate-bounce">✅ 저장됨</span>}
-            </div>
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-black text-gray-500 mb-1 uppercase">구글 시트 ID</label>
-                  <input 
-                    type="text" 
-                    value={sheetId}
-                    onChange={(e) => setSheetId(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
-                    placeholder="ID 입력"
-                  />
+          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+            {selectedClass ? (
+              <>
+                <div className="bg-white p-2 rounded-xl shadow-sm mb-3">
+                   <img src={qrUrl} alt="QR" className="w-40 h-40 mix-blend-multiply" />
                 </div>
-                <div>
-                  <label className="block text-xs font-black text-gray-500 mb-1 uppercase">Apps Script URL</label>
-                  <input 
-                    type="text" 
-                    value={scriptUrl}
-                    onChange={(e) => setScriptUrl(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl font-mono text-sm"
-                    placeholder="https://..."
-                  />
-                </div>
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full">Scan to Start</span>
+              </>
+            ) : (
+              <div className="w-40 h-40 flex items-center justify-center text-gray-300 text-center text-xs font-medium">
+                왼쪽에서 반을<br/>선택(입력)해주세요
               </div>
-              <div className="bg-amber-50 p-6 rounded-3xl border-2 border-amber-200">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-black text-amber-900 uppercase">학생 접속 주소 (Base URL)</label>
-                  <button onClick={autoDetectUrl} className="text-[10px] bg-amber-200 px-2 py-1 rounded-md font-bold">자동 설정</button>
-                </div>
-                <input 
-                  type="text" 
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  className={`w-full px-4 py-3 border-2 rounded-xl font-mono text-sm ${isInvalidUrl ? 'border-red-400 bg-red-50' : 'border-amber-200 bg-white'}`}
-                />
-              </div>
-              <Button onClick={handleSaveConfig} fullWidth disabled={isSaving || isInvalidUrl} className={`py-4 ${isSaved ? 'bg-green-600' : 'bg-indigo-600'}`}>
-                {isSaving ? '저장 중...' : (isSaved ? '✅ 설정 저장 완료' : '설정 저장하기')}
-              </Button>
-            </div>
+            )}
           </div>
         </div>
-      )}
+      </section>
+
+      {/* 2. 시스템 설정 섹션 */}
+      <div className="space-y-6">
+        <h3 className="text-xl font-black text-gray-800 px-2 flex items-center gap-2">
+          ⚙️ 시스템 설정
+          <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded-md">자동 저장됨</span>
+        </h3>
+
+        {/* 2-1. 구글 시트 연결 */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
+          <div className="flex justify-between items-start mb-4">
+             <div>
+               <label className="text-sm font-bold text-gray-700 block mb-1">1. 문제 데이터 시트 (Google Sheets)</label>
+               <p className="text-xs text-gray-400">단어와 뜻이 적힌 구글 스프레드시트 주소를 입력하세요.</p>
+               {connectionStatus === 'success_manual' && (
+                 <p className="text-xs text-orange-500 font-bold mt-2 animate-pulse">
+                   ⚠️ 시트 탭 목록을 가져오지 못했습니다. 공유 설정에서 '링크가 있는 모든 사용자'가 선택되었는지 확인해주세요.
+                 </p>
+               )}
+               {connectionStatus === 'fail' && (
+                 <p className="text-xs text-red-500 font-bold mt-2 animate-pulse">
+                   ❌ 시트에 접근할 수 없습니다. 시트 우측 상단 [공유] 버튼 > '링크가 있는 모든 사용자' 선택 > [링크 복사]를 해주세요.
+                 </p>
+               )}
+             </div>
+             {connectionStatus === 'success' && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">✅ 연결됨</span>}
+             {connectionStatus === 'success_manual' && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold">⚠️ 부분 연결</span>}
+             {connectionStatus === 'fail' && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">❌ 연결 실패</span>}
+          </div>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={sheetId} 
+              onChange={(e) => handleSheetIdChange(e.target.value)} 
+              className={`flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all ${
+                connectionStatus === 'fail' || connectionStatus === 'success_manual' ? 'border-red-300 bg-red-50' : 'border-gray-200'
+              }`}
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+            />
+            <button onClick={() => loadTabs(sheetId)} className="bg-gray-800 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-black transition-colors">
+              연결 확인
+            </button>
+          </div>
+        </div>
+
+        {/* 2-2. 채점 서버 연결 */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md relative overflow-hidden">
+          {autoCorrected && (
+             <div className="absolute top-0 left-0 right-0 bg-green-500 text-white text-xs font-bold text-center py-1 animate-pop">
+               {autoCorrected}
+             </div>
+          )}
+          <div className="flex justify-between items-start mb-4">
+             <div>
+               <label className="text-sm font-bold text-gray-700 block mb-1">2. 채점 서버 (Apps Script URL)</label>
+               <p className="text-xs text-gray-400">시험 결과를 시트에 저장하기 위한 웹 앱 주소입니다.</p>
+             </div>
+             <button onClick={() => setShowScriptGuide(!showScriptGuide)} className="text-xs font-bold text-indigo-600 underline hover:text-indigo-800">
+               {showScriptGuide ? '가이드 닫기' : '설정 방법 보기'}
+             </button>
+          </div>
+
+          <div className="mb-4">
+             <input 
+              type="text" 
+              value={scriptUrl} 
+              onChange={(e) => handleScriptUrlChange(e.target.value)} 
+              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono transition-all ${scriptUrl && !scriptUrl.endsWith('/exec') ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'}`}
+              placeholder="https://script.google.com/macros/s/.../exec"
+            />
+            {scriptUrl && !scriptUrl.endsWith('/exec') && (
+              <p className="text-xs text-yellow-600 mt-2 font-medium">💡 주소가 '/exec'로 끝나야 합니다. 복사가 덜 되었는지 확인해주세요.</p>
+            )}
+          </div>
+
+          {/* Apps Script Guide Toggle */}
+          {showScriptGuide && (
+            <div className="bg-gray-900 rounded-xl p-6 text-gray-300 animate-pop">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Apps Script Setup</span>
+                <button 
+                  onClick={handleCopyCode} 
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all ${isCodeCopied ? 'bg-green-500 text-white' : 'bg-white text-black hover:bg-gray-200'}`}
+                >
+                  {isCodeCopied ? '✅ 복사됨' : '📋 코드 복사'}
+                </button>
+              </div>
+              <ol className="text-xs space-y-2 mb-4 list-decimal list-inside text-gray-400">
+                <li>구글 시트 메뉴에서 <span className="text-white font-bold">[확장 프로그램] {'>'} [Apps Script]</span> 실행</li>
+                <li>기존 코드를 모두 지우고, 위 버튼으로 복사한 코드를 붙여넣기</li>
+                <li>디스켓 아이콘(💾)을 눌러 저장</li>
+                <li>우측 상단 <span className="text-white font-bold">[배포] {'>'} [새 배포]</span> 클릭</li>
+                <li>유형을 톱니바퀴 눌러 <strong>[웹 앱]</strong> 선택</li>
+                <li>설명: 입력 자유, <strong>액세스 권한: [모든 사용자]</strong> (필수!)</li>
+                <li>[배포] 클릭 후 승인하고, 생성된 URL을 위 칸에 붙여넣기</li>
+              </ol>
+            </div>
+          )}
+        </div>
+
+        {/* 2-3. 배포 주소 설정 */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
+           <div className="flex justify-between items-start mb-4">
+             <div>
+               <label className="text-sm font-bold text-gray-700 block mb-1">3. 학생 접속 기본 주소 (Base URL)</label>
+               <p className="text-xs text-gray-400">
+                 QR코드가 연결될 주소입니다. 
+                 <span className="text-indigo-600 font-bold ml-1">
+                   지금 보고 계신 사이트 주소가 자동으로 입력되어 있으니, 따로 복사해오지 않으셔도 됩니다.
+                 </span>
+               </p>
+             </div>
+             <button 
+               onClick={() => handleBaseUrlChange(window.location.origin + window.location.pathname)}
+               className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
+             >
+               현재 주소로 초기화
+             </button>
+           </div>
+           <input 
+              type="text" 
+              value={baseUrl} 
+              onChange={(e) => handleBaseUrlChange(e.target.value)} 
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-500 bg-gray-50"
+            />
+        </div>
+      </div>
     </div>
   );
 };

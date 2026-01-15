@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types';
-import Landing from './views/Landing';
-import Quiz from './views/Quiz';
-import Result from './views/Result';
-import TeacherDashboard from './views/TeacherDashboard';
-import IncorrectNote from './views/IncorrectNote';
-import { generateQuizQuestions } from './services/geminiService';
-import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
+import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types.ts';
+import Landing from './views/Landing.tsx';
+import Quiz from './views/Quiz.tsx';
+import Result from './views/Result.tsx';
+import TeacherDashboard from './views/TeacherDashboard.tsx';
+import IncorrectNote from './views/IncorrectNote.tsx';
+import { generateQuizQuestions } from './services/geminiService.ts';
+import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService.ts';
 
 const RESULT_STORAGE_KEY = 'vocamaster_results';
 const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
@@ -126,14 +126,18 @@ function App() {
       const count = Math.min(sheetWords.length, 50);
       setLoadingMessage(`시험지를 생성 중입니다...`);
 
-      // generateQuizQuestions will now handle API failures internally and fallback to local generation
       const generatedQuestions = await generateQuizQuestions(testDate, sheetWords);
       
       setQuestions(generatedQuestions);
       setCurrentView(AppView.QUIZ);
 
     } catch (error: any) {
-      alert(`문제가 발생했습니다: ${error.message}\n\n설정(시트 ID, 탭 이름)을 확인해주세요.`);
+      let errorMsg = `문제가 발생했습니다: ${error.message}`;
+      if (error.message.includes('Sheet not found') || error.message.includes('404')) {
+        errorMsg = `구글 시트를 찾을 수 없습니다.\n\n1. 시트가 '링크가 있는 모든 사용자에게 공개' 되어 있는지 확인하세요.\n2. 탭 이름 '${className}'이(가) 시트 하단 탭 이름과 정확히 일치하는지 확인하세요.`;
+      }
+      
+      alert(errorMsg);
       console.error(error);
       setSession(null);
     } finally {

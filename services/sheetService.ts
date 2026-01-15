@@ -41,6 +41,20 @@ export const fetchSheetTabs = async (sheetId: string): Promise<string[]> => {
   }
 };
 
+export const checkSheetAvailability = async (sheetId: string): Promise<boolean> => {
+  // Try to fetch the CSV of the default (first) sheet.
+  // This endpoint works for public sheets without an API key.
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+  
+  try {
+    const response = await fetch(url);
+    return response.ok;
+  } catch (error) {
+    console.warn("Public sheet access check failed:", error);
+    return false;
+  }
+};
+
 export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Promise<SheetWord[]> => {
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
   
