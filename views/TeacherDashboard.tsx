@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import Button from '../components/Button.tsx';
-import { fetchSheetTabs, checkSheetAvailability } from '../services/sheetService.ts';
+import Button from '../components/Button';
+import { fetchSheetTabs, checkSheetAvailability } from '../services/sheetService';
 
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.3 (Vercel Check)";
+const APP_VERSION = "v1.4 (Build Fix)";
 // User's Vercel Domain
 const PRESET_DOMAIN = "https://voca-git-main-aiden8584-ops-projects.vercel.app";
 
@@ -104,7 +104,6 @@ const TeacherDashboard: React.FC = () => {
       setBaseUrl(sanitizeInput(storedBaseUrl));
     } else {
       const currentUrl = window.location.origin + window.location.pathname;
-      // If teacher is on localhost, default to the production Vercel URL to avoid generating broken localhost links
       if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
         setBaseUrl(PRESET_DOMAIN);
       } else {
@@ -183,15 +182,12 @@ const TeacherDashboard: React.FC = () => {
     let url = baseUrl.trim();
     
     if (!url) {
-        // Fallback if empty
         const current = window.location.origin + window.location.pathname;
         url = current.includes('localhost') ? PRESET_DOMAIN : current;
     }
     
-    // Remove trailing slash
     url = url.replace(/\/$/, '');
 
-    // Force Protocol
     if (!/^https?:\/\//i.test(url)) {
         if (url.includes('localhost') || url.includes('127.0.0.1')) {
             url = `http://${url}`;
@@ -418,10 +414,10 @@ const TeacherDashboard: React.FC = () => {
                 </button>
               </div>
               <ol className="text-xs space-y-2 mb-4 list-decimal list-inside text-gray-400">
-                <li>구글 시트 메뉴에서 <span className="text-white font-bold">[확장 프로그램] {'>'} [Apps Script]</span> 실행</li>
+                <li>구글 시트 메뉴에서 <span className="text-white font-bold">[확장 프로그램] &gt; [Apps Script]</span> 실행</li>
                 <li>기존 코드를 모두 지우고, 위 버튼으로 복사한 코드를 붙여넣기</li>
                 <li>디스켓 아이콘(💾)을 눌러 저장</li>
-                <li>우측 상단 <span className="text-white font-bold">[배포] {'>'} [새 배포]</span> 클릭</li>
+                <li>우측 상단 <span className="text-white font-bold">[배포] &gt; [새 배포]</span> 클릭</li>
                 <li>유형을 톱니바퀴 눌러 <strong>[웹 앱]</strong> 선택</li>
                 <li>설명: 입력 자유, <strong>액세스 권한: [모든 사용자]</strong> (필수!)</li>
                 <li>[배포] 클릭 후 승인하고, 생성된 URL을 위 칸에 붙여넣기</li>
