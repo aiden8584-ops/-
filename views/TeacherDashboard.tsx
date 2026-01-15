@@ -6,6 +6,11 @@ const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
+// Deployment Version Indicator
+const APP_VERSION = "v1.2 (Latest)";
+// User's Vercel Domain
+const PRESET_DOMAIN = "https://voca-git-main-aiden8584-ops-projects.vercel.app";
+
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
  * [VocaMaster 단어시험 채점 시스템]
@@ -57,14 +62,12 @@ const sanitizeInput = (val: string) => {
   if (!val) return '';
   let clean = val.trim();
   clean = clean.replace(/\\$/, ''); 
-  // We allow full URLs now, but clean up some common paste errors if needed
   clean = clean.replace(/^"|"$/g, '');
   return clean;
 };
 
 const extractSheetId = (val: string) => {
   if (!val) return '';
-  // If it's a full URL, extract ID
   const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
   return match ? match[1] : val;
 };
@@ -96,12 +99,17 @@ const TeacherDashboard: React.FC = () => {
       setShowScriptGuide(true);
     }
     
-    // Load stored Base URL or detect current
+    // Smart Base URL Logic
     if (storedBaseUrl) {
       setBaseUrl(sanitizeInput(storedBaseUrl));
     } else {
-      const detected = window.location.origin + window.location.pathname;
-      setBaseUrl(detected);
+      const currentUrl = window.location.origin + window.location.pathname;
+      // If teacher is on localhost, default to the production Vercel URL to avoid generating broken localhost links
+      if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
+        setBaseUrl(PRESET_DOMAIN);
+      } else {
+        setBaseUrl(currentUrl);
+      }
     }
 
     if (storedSheetId) {
@@ -174,18 +182,17 @@ const TeacherDashboard: React.FC = () => {
     // URL Construction Logic (Robust)
     let url = baseUrl.trim();
     
-    // If empty, fallback to current window location
     if (!url) {
-        url = window.location.origin + window.location.pathname;
+        // Fallback if empty
+        const current = window.location.origin + window.location.pathname;
+        url = current.includes('localhost') ? PRESET_DOMAIN : current;
     }
     
-    // Remove trailing slash to standardize
+    // Remove trailing slash
     url = url.replace(/\/$/, '');
 
-    // Force Protocol (Crucial for external links)
-    // If it doesn't start with http/https, add it.
+    // Force Protocol
     if (!/^https?:\/\//i.test(url)) {
-        // If localhost, use http, otherwise default to https
         if (url.includes('localhost') || url.includes('127.0.0.1')) {
             url = `http://${url}`;
         } else {
@@ -193,7 +200,6 @@ const TeacherDashboard: React.FC = () => {
         }
     }
 
-    // Add query params
     return `${url}/?${params.toString()}`;
   }, [sheetId, scriptUrl, selectedClass, baseUrl]);
 
@@ -203,7 +209,14 @@ const TeacherDashboard: React.FC = () => {
   }, [shareUrl]);
 
   return (
-    <div className="animate-pop space-y-10 pb-24">
+    <div className="animate-pop space-y-10 pb-24 relative">
+      {/* Version Indicator */}
+      <div className="absolute top-0 right-0">
+        <span className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded-full font-mono opacity-50 hover:opacity-100 transition-opacity">
+          {APP_VERSION}
+        </span>
+      </div>
+
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-black text-gray-900 tracking-tight">선생님 관리 대시보드</h2>
         <p className="text-gray-500 text-sm">학생들에게 배포할 시험 링크를 생성하고 시스템을 설정합니다.</p>
@@ -441,7 +454,7 @@ const TeacherDashboard: React.FC = () => {
               value={baseUrl} 
               onChange={(e) => handleBaseUrlChange(e.target.value)} 
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-700 bg-white placeholder-gray-300"
-              placeholder="예: https://voca-app.vercel.app"
+              placeholder={`예: ${PRESET_DOMAIN}`}
             />
         </div>
       </div>
