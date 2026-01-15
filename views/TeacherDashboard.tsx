@@ -57,9 +57,7 @@ const sanitizeInput = (val: string) => {
   if (!val) return '';
   let clean = val.trim();
   clean = clean.replace(/\\$/, ''); 
-  clean = clean.replace(/googhttps?$/, '');
-  clean = clean.replace(/googhtt$/, '');
-  // Remove quotes if user pasted JSON string
+  // We allow full URLs now, but clean up some common paste errors if needed
   clean = clean.replace(/^"|"$/g, '');
   return clean;
 };
@@ -98,7 +96,7 @@ const TeacherDashboard: React.FC = () => {
       setShowScriptGuide(true);
     }
     
-    // Base URL Logic - Ensure protocol
+    // Load stored Base URL or detect current
     if (storedBaseUrl) {
       setBaseUrl(sanitizeInput(storedBaseUrl));
     } else {
@@ -174,19 +172,28 @@ const TeacherDashboard: React.FC = () => {
     params.set('date', new Date().toISOString().split('T')[0]);
     
     // URL Construction Logic (Robust)
-    let url = baseUrl.trim() || (window.location.origin + window.location.pathname);
+    let url = baseUrl.trim();
+    
+    // If empty, fallback to current window location
+    if (!url) {
+        url = window.location.origin + window.location.pathname;
+    }
     
     // Remove trailing slash to standardize
-    if (url.endsWith('/')) {
-        url = url.slice(0, -1);
-    }
+    url = url.replace(/\/$/, '');
 
     // Force Protocol (Crucial for external links)
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = window.location.protocol + '//' + url;
+    // If it doesn't start with http/https, add it.
+    if (!/^https?:\/\//i.test(url)) {
+        // If localhost, use http, otherwise default to https
+        if (url.includes('localhost') || url.includes('127.0.0.1')) {
+            url = `http://${url}`;
+        } else {
+            url = `https://${url}`;
+        }
     }
 
-    // Add trailing slash before query params to be safe
+    // Add query params
     return `${url}/?${params.toString()}`;
   }, [sheetId, scriptUrl, selectedClass, baseUrl]);
 
@@ -265,7 +272,7 @@ const TeacherDashboard: React.FC = () => {
                  <input 
                    readOnly
                    value={shareUrl || "설정 후 생성됩니다"}
-                   className="w-full text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg p-2 font-mono"
+                   className="w-full text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono break-all"
                  />
               </div>
 
@@ -414,11 +421,11 @@ const TeacherDashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
            <div className="flex justify-between items-start mb-4">
              <div>
-               <label className="text-sm font-bold text-gray-700 block mb-1">3. 학생 접속 기본 주소 (Base URL)</label>
+               <label className="text-sm font-bold text-gray-700 block mb-1">3. 사이트 주소 설정 (Vercel 도메인)</label>
                <p className="text-xs text-gray-400">
                  QR코드가 연결될 주소입니다. 
                  <span className="text-indigo-600 font-bold ml-1">
-                   지금 보고 계신 사이트 주소가 자동으로 입력되어 있으니, 따로 복사해오지 않으셔도 됩니다.
+                   'https://...'가 없어도 자동으로 붙여줍니다. Vercel 주소를 이곳에 붙여넣으세요.
                  </span>
                </p>
              </div>
@@ -426,14 +433,15 @@ const TeacherDashboard: React.FC = () => {
                onClick={() => handleBaseUrlChange(window.location.origin + window.location.pathname)}
                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
              >
-               현재 주소로 초기화
+               현재 주소 자동감지
              </button>
            </div>
            <input 
               type="text" 
               value={baseUrl} 
               onChange={(e) => handleBaseUrlChange(e.target.value)} 
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-500 bg-gray-50"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-700 bg-white placeholder-gray-300"
+              placeholder="예: https://voca-app.vercel.app"
             />
         </div>
       </div>
