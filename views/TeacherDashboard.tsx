@@ -7,7 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.2 (Latest)";
+const APP_VERSION = "v1.3 (Vercel Check)";
 // User's Vercel Domain
 const PRESET_DOMAIN = "https://voca-git-main-aiden8584-ops-projects.vercel.app";
 
