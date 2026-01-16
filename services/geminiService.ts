@@ -107,20 +107,8 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
     return JSON.parse(text) as Question[];
 
   } catch (error: any) {
-    // If the request fails with "Requested entity was not found.", reset key selection and prompt for key selection
-    if (error.message?.includes("Requested entity was not found")) {
-      const aistudio = (window as any).aistudio;
-      if (aistudio && typeof aistudio.openSelectKey === 'function') {
-        await aistudio.openSelectKey();
-      }
-    }
-
-    console.warn("Gemini API Error (likely quota). Falling back to local generation:", error.message);
-    
-    if (error.message?.includes("429") || error.message?.includes("quota") || error.message?.includes("limit")) {
-      console.info("Using local quiz engine for stability.");
-    }
-    
+    // Prevent triggering Google Login/Key selection prompt
+    console.warn("Gemini API Error. Falling back to local generation:", error.message);
     return generateLocalQuiz(sheetWords);
   }
 };
