@@ -1,3 +1,4 @@
+
 import { SheetWord, QuizResult } from "../types";
 
 // Helper to parse CSV line correctly handling quotes
@@ -18,15 +19,26 @@ const parseCSVLine = (line: string): string[] => {
   return result;
 };
 
+/**
+ * Fetches tab titles from a spreadsheet.
+ * Note: This requires the API Key to have Sheets API access.
+ * Most standard Gemini keys from AI Studio don't have this enabled by default.
+ */
 export const fetchSheetTabs = async (sheetId: string): Promise<string[]> => {
   const apiKey = process.env.API_KEY;
+  if (!apiKey) return [];
+  
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title&key=${apiKey}`;
 
   try {
     const response = await fetch(url);
     
     if (!response.ok) {
-      console.warn("Failed to fetch sheet tabs via API. Falling back to manual input.");
+      const errorData = await response.json().catch(() => ({}));
+      console.warn("Google Sheets API rejected the request. This is normal if your API Key doesn't have Sheets permission enabled in GCP.", {
+        status: response.status,
+        message: errorData.error?.message || "Unknown error"
+      });
       return [];
     }
 
@@ -36,14 +48,13 @@ export const fetchSheetTabs = async (sheetId: string): Promise<string[]> => {
     }
     return [];
   } catch (error) {
-    console.error("Error fetching sheet tabs:", error);
+    console.error("Critical error fetching sheet tabs:", error);
     return [];
   }
 };
 
 export const checkSheetAvailability = async (sheetId: string): Promise<boolean> => {
-  // Try to fetch the CSV of the default (first) sheet.
-  // This endpoint works for public sheets without an API key.
+  // Uses the visualization API which works on public sheets without an API key
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
   
   try {
@@ -63,9 +74,9 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
     
     if (!response.ok) {
       if (response.status === 404) {
-        throw new Error(`Sheet not found. Check ID or Tab Name: ${tabName}`);
+        throw new Error(`시트 탭 '${tabName}'을 찾을 수 없습니다. 시트 하단의 탭 이름과 정확히 일치하는지 확인하세요.`);
       }
-      throw new Error(`Failed to fetch sheet. Status: ${response.status}`);
+      throw new Error(`시트 데이터를 가져오지 못했습니다. (Status: ${response.status})`);
     }
 
     const text = await response.text();
@@ -82,10 +93,9 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
         const word = cols[0];
         const fullMeaning = cols[1];
         
-        if (word.toLowerCase() === 'word' || word.toLowerCase() === 'english') continue;
+        if (word.toLowerCase() === 'word' || word.toLowerCase() === 'english' || word.toLowerCase() === '단어') continue;
 
         if (word && fullMeaning) {
-          // Rule: If multiple meanings exist (comma separated), take only the first one
           const primaryMeaning = fullMeaning.split(',')[0].trim();
           words.push({ word, meaning: primaryMeaning });
         }
@@ -93,7 +103,7 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
     }
 
     if (words.length === 0) {
-      throw new Error("Found the sheet tab, but could not parse any words.");
+      throw new Error("탭은 찾았으나, 단어 데이터를 파싱하지 못했습니다. (A열: 영어, B열: 뜻 형식인지 확인)");
     }
 
     return words;
@@ -107,7 +117,6 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
 export const submitResultToSheet = async (scriptUrl: string, result: QuizResult): Promise<boolean> => {
   try {
     const payload = {
-      // Changed from result.date to result.className as per teacher's request
       tabName: result.className,
       studentName: result.studentName,
       score: result.score,

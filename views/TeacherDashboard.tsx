@@ -9,18 +9,17 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.13 (Single Result Tab)";
+const APP_VERSION = "v1.14 (Better Guidance)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
- * [VocaMaster 단어시험 채점 시스템 v1.13]
+ * [VocaMaster 단어시험 채점 시스템 v1.14]
  * 업데이트 내용: 모든 결과가 '결과' 탭 하나에 통합되어 저장됩니다.
- * (반 정보는 첫 번째 열에 자동으로 기록됩니다)
  * ---------------------------------------------------------
  */
 
 function doGet(e) {
-  return ContentService.createTextOutput("VocaMaster 연결 성공! (설정이 완료되었습니다)");
+  return ContentService.createTextOutput("VocaMaster 연결 성공!");
 }
 
 function doPost(e) {
@@ -31,24 +30,18 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    // 중요: 모든 결과는 '결과' 탭에 저장합니다.
     var resultTabName = "결과";
     var sheet = ss.getSheetByName(resultTabName);
 
-    // 결과 탭이 없으면 자동으로 생성합니다.
     if (!sheet) {
       sheet = ss.insertSheet(resultTabName);
-      // 헤더 추가 (반 구분 컬럼 추가됨)
       sheet.appendRow(["구분(반)", "이름", "점수", "총점", "소요시간(초)", "시험날짜", "제출일시"]);
-      // 보기 좋게 1행 고정 및 볼드 처리
       sheet.setFrozenRows(1);
       sheet.getRange(1, 1, 1, 7).setFontWeight("bold").setBackground("#f3f4f6");
     }
 
-    // 결과 데이터 추가
     sheet.appendRow([
-      data.tabName || "Unknown", // 반 이름
+      data.tabName || "Unknown", 
       data.studentName,
       data.score,
       data.total,
@@ -93,7 +86,6 @@ const TeacherDashboard: React.FC = () => {
   const [autoCorrected, setAutoCorrected] = useState<string | null>(null);
 
   useEffect(() => {
-    // Priority: LocalStorage > Config File
     const storedSheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
     const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || APP_CONFIG.scriptUrl;
     const storedBaseUrl = localStorage.getItem(BASE_URL_KEY) || APP_CONFIG.baseUrl;
@@ -105,12 +97,10 @@ const TeacherDashboard: React.FC = () => {
       setShowScriptGuide(true);
     }
     
-    // Smart Base URL Logic
     if (storedBaseUrl) {
       setBaseUrl(sanitizeInput(storedBaseUrl));
     } else {
       const currentUrl = window.location.origin + window.location.pathname;
-      // If localhost, force user to input their real deployed URL unless config has it
       if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
         setBaseUrl("");
       } else {
@@ -141,7 +131,6 @@ const TeacherDashboard: React.FC = () => {
         }
       }
     } catch (e) { 
-      console.error("Tabs loading error", e);
       setConnectionStatus('fail');
     } finally {
       setIsRefreshing(false);
@@ -177,10 +166,8 @@ const TeacherDashboard: React.FC = () => {
     setTimeout(() => setIsCodeCopied(false), 2000);
   };
 
-  // Detect potentially private Vercel Preview URLs
   const isPreviewUrl = useMemo(() => {
     if (!baseUrl) return false;
-    // Check for patterns like 'app-git-branch-user.vercel.app' or double dashes which often indicate preview deployments
     return baseUrl.includes('.vercel.app') && (baseUrl.includes('-git-') || (baseUrl.match(/-/g) || []).length > 2);
   }, [baseUrl]);
 
@@ -192,27 +179,16 @@ const TeacherDashboard: React.FC = () => {
     if (selectedClass) params.set('class_name', selectedClass);
     params.set('date', new Date().toISOString().split('T')[0]);
     
-    // URL Construction Logic (Robust)
     let url = baseUrl.trim();
-    
     if (!url) {
         const current = window.location.origin + window.location.pathname;
-        if (current.includes('localhost') || current.includes('127.0.0.1')) {
-           return "";
-        }
+        if (current.includes('localhost') || current.includes('127.0.0.1')) return "";
         url = current;
     }
-    
     url = url.replace(/\/$/, '');
-
     if (!/^https?:\/\//i.test(url)) {
-        if (url.includes('localhost') || url.includes('127.0.0.1')) {
-            url = `http://${url}`;
-        } else {
-            url = `https://${url}`;
-        }
+        url = url.includes('localhost') ? `http://${url}` : `https://${url}`;
     }
-
     return `${url}/?${params.toString()}`;
   }, [sheetId, scriptUrl, selectedClass, baseUrl]);
 
@@ -223,7 +199,6 @@ const TeacherDashboard: React.FC = () => {
 
   return (
     <div className="animate-pop space-y-10 pb-24 relative">
-      {/* Version Indicator */}
       <div className="absolute top-0 right-0">
         <span className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded-full font-mono opacity-50 hover:opacity-100 transition-opacity">
           {APP_VERSION}
@@ -235,7 +210,7 @@ const TeacherDashboard: React.FC = () => {
         <p className="text-gray-500 text-sm">학생들에게 배포할 시험 링크를 생성하고 시스템을 설정합니다.</p>
         {(APP_CONFIG.sheetId || APP_CONFIG.scriptUrl) && (
            <p className="text-xs text-indigo-600 font-bold bg-indigo-50 inline-block px-3 py-1 rounded-full">
-             💡 영구 설정 파일(config.ts)의 값을 불러왔습니다.
+             💡 영구 설정 파일(config.ts)의 기본값을 사용 중입니다.
            </p>
         )}
       </div>
@@ -278,27 +253,28 @@ const TeacherDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="relative">
+                <div className="space-y-3">
                   <input
                     type="text"
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value)}
-                    placeholder="시트의 탭(반) 이름을 직접 입력하세요"
-                    className="w-full px-4 py-4 border-2 border-indigo-100 rounded-xl font-bold text-gray-700 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
+                    placeholder="수업반(탭) 이름을 직접 입력하세요"
+                    className="w-full px-4 py-4 border-2 border-indigo-500 rounded-xl font-bold text-indigo-700 bg-indigo-50/30 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder-indigo-300"
                   />
+                  {sheetId && (
+                    <div className="bg-indigo-50/80 border border-indigo-100 rounded-lg p-3 text-xs leading-relaxed">
+                      <p className="text-indigo-700 font-bold mb-1">💡 안내: 시트 탭 목록을 자동으로 가져오지 못했습니다.</p>
+                      <p className="text-indigo-500">
+                        이는 구글 시트 보안 설정 때문일 수 있으나, 위 칸에 <strong>구글 시트 하단에 적힌 탭 이름(예: 예비고1)을 정확히 입력</strong>하면 정상적으로 작동합니다.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {availableTabs.length === 0 && sheetId && (
-                <p className="text-xs text-orange-500 mt-2 font-medium">
-                  ⚠️ 시트 탭을 불러오지 못했습니다. 탭 이름을 직접 입력하거나, 시트 [공유] 설정이 '링크가 있는 모든 사용자'인지 확인하세요.
-                </p>
               )}
             </div>
 
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. 링크 공유하기</label>
-              
               <div className="mb-2">
                  <input 
                    readOnly
@@ -306,7 +282,6 @@ const TeacherDashboard: React.FC = () => {
                    className={`w-full text-xs border rounded-lg p-3 font-mono break-all ${!shareUrl ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
                  />
               </div>
-
               <div className="flex gap-2">
                 <Button 
                     variant="secondary" 
@@ -336,11 +311,7 @@ const TeacherDashboard: React.FC = () => {
             {isPreviewUrl && (
               <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-4">
                 <p className="text-red-600 font-black text-xl mb-2">⚠️ QR 사용 불가</p>
-                <p className="text-gray-600 text-xs leading-tight">
-                  현재 입력된 주소는 <strong>임시 주소(Preview)</strong>입니다.<br/>
-                  학생들은 로그인해야만 볼 수 있습니다.
-                </p>
-                <p className="text-xs mt-2 text-indigo-600 font-bold">Vercel에서 가장 짧은 주소를 사용하세요.</p>
+                <p className="text-gray-600 text-xs leading-tight">임시 주소(Preview)에서는 QR이 작동하지 않을 수 있습니다.</p>
               </div>
             )}
             {selectedClass && shareUrl ? (
@@ -352,7 +323,7 @@ const TeacherDashboard: React.FC = () => {
               </>
             ) : (
               <div className="w-40 h-40 flex items-center justify-center text-gray-300 text-center text-xs font-medium">
-                {!shareUrl ? "사이트 주소를\n입력해주세요" : "왼쪽에서 반을\n선택해주세요"}
+                {!shareUrl ? "사이트 주소를\n설정해주세요" : "왼쪽에서 반 이름을\n입력해주세요"}
               </div>
             )}
           </div>
@@ -361,39 +332,26 @@ const TeacherDashboard: React.FC = () => {
 
       {/* 2. 시스템 설정 섹션 */}
       <div className="space-y-6">
-        <h3 className="text-xl font-black text-gray-800 px-2 flex items-center gap-2">
-          ⚙️ 시스템 설정
-          <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded-md">자동 저장됨</span>
-        </h3>
+        <h3 className="text-xl font-black text-gray-800 px-2 flex items-center gap-2">⚙️ 시스템 설정</h3>
 
         {/* 2-1. 구글 시트 연결 */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
           <div className="flex justify-between items-start mb-4">
              <div>
-               <label className="text-sm font-bold text-gray-700 block mb-1">1. 문제 데이터 시트 (Google Sheets)</label>
-               <p className="text-xs text-gray-400">단어와 뜻이 적힌 구글 스프레드시트 주소를 입력하세요. <br/><strong>결과도 이 시트의 '결과' 탭에 저장됩니다.</strong></p>
-               {connectionStatus === 'success_manual' && (
-                 <p className="text-xs text-orange-500 font-bold mt-2 animate-pulse">
-                   ⚠️ 시트 탭 목록을 가져오지 못했습니다. 공유 설정에서 '링크가 있는 모든 사용자'가 선택되었는지 확인해주세요.
-                 </p>
-               )}
-               {connectionStatus === 'fail' && (
-                 <p className="text-xs text-red-500 font-bold mt-2 animate-pulse">
-                   ❌ 시트에 접근할 수 없습니다. 시트 우측 상단 [공유] 버튼 &gt; '링크가 있는 모든 사용자' 선택 &gt; [링크 복사]를 해주세요.
-                 </p>
-               )}
+               <label className="text-sm font-bold text-gray-700 block mb-1">1. 문제 데이터 시트 (Google Sheets URL)</label>
+               <p className="text-xs text-gray-400">단어와 뜻이 있는 스프레드시트 주소를 붙여넣으세요.</p>
              </div>
              {connectionStatus === 'success' && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-bold">✅ 연결됨</span>}
-             {connectionStatus === 'success_manual' && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-bold">⚠️ 부분 연결</span>}
-             {connectionStatus === 'fail' && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">❌ 연결 실패</span>}
+             {connectionStatus === 'success_manual' && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-bold">📂 시트 확인됨</span>}
+             {connectionStatus === 'fail' && <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">❌ 연결 오류</span>}
           </div>
           <div className="flex gap-2">
             <input 
               type="text" 
               value={sheetId} 
               onChange={(e) => handleSheetIdChange(e.target.value)} 
-              className={`flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm transition-all ${
-                connectionStatus === 'fail' || connectionStatus === 'success_manual' ? 'border-red-300 bg-red-50' : 'border-gray-200'
+              className={`flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all ${
+                connectionStatus === 'fail' ? 'border-red-300 bg-red-50' : 'border-gray-200'
               }`}
               placeholder="https://docs.google.com/spreadsheets/d/..."
             />
@@ -403,130 +361,71 @@ const TeacherDashboard: React.FC = () => {
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 transition-colors flex items-center"
-              >
-                📂 결과 시트 열기
-              </a>
+              >📂 열기</a>
             )}
             <button onClick={() => loadTabs(sheetId)} className="bg-gray-800 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-black transition-colors whitespace-nowrap">
               연결 확인
             </button>
           </div>
+          {connectionStatus === 'fail' && (
+             <p className="text-[11px] text-red-500 mt-2 font-medium">⚠️ 시트가 '링크가 있는 모든 사용자'에게 공개되어 있는지 다시 한번 확인해주세요.</p>
+          )}
         </div>
 
         {/* 2-2. 채점 서버 연결 */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md relative overflow-hidden">
           {autoCorrected && (
-             <div className="absolute top-0 left-0 right-0 bg-green-500 text-white text-xs font-bold text-center py-1 animate-pop">
-               {autoCorrected}
-             </div>
+             <div className="absolute top-0 left-0 right-0 bg-green-500 text-white text-[10px] font-bold text-center py-1">{autoCorrected}</div>
           )}
           <div className="flex justify-between items-start mb-4">
              <div>
                <label className="text-sm font-bold text-gray-700 block mb-1">2. 채점 서버 (Apps Script URL)</label>
-               <p className="text-xs text-gray-400">시험 결과를 시트에 저장하기 위한 웹 앱 주소입니다.</p>
+               <p className="text-xs text-gray-400">결과를 시트에 기록하기 위한 주소입니다.</p>
              </div>
-             <button onClick={() => setShowScriptGuide(!showScriptGuide)} className="text-xs font-bold text-indigo-600 underline hover:text-indigo-800">
-               {showScriptGuide ? '가이드 닫기' : '설정 방법 보기'}
-             </button>
+             <button onClick={() => setShowScriptGuide(!showScriptGuide)} className="text-xs font-bold text-indigo-600 underline">설정 방법</button>
           </div>
-
-          <div className="mb-4">
-             <input 
-              type="text" 
-              value={scriptUrl} 
-              onChange={(e) => handleScriptUrlChange(e.target.value)} 
-              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono transition-all ${scriptUrl && !scriptUrl.endsWith('/exec') ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'}`}
-              placeholder="https://script.google.com/macros/s/.../exec"
-            />
-            {scriptUrl && !scriptUrl.endsWith('/exec') && (
-              <p className="text-xs text-yellow-600 mt-2 font-medium">💡 주소가 '/exec'로 끝나야 합니다. 복사가 덜 되었는지 확인해주세요.</p>
-            )}
-          </div>
-
-          {/* Apps Script Guide Toggle */}
+          <input 
+            type="text" 
+            value={scriptUrl} 
+            onChange={(e) => handleScriptUrlChange(e.target.value)} 
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+            placeholder="https://script.google.com/macros/s/.../exec"
+          />
           {showScriptGuide && (
-            <div className="bg-gray-900 rounded-xl p-6 text-gray-300 animate-pop">
+            <div className="mt-4 bg-gray-900 rounded-xl p-6 text-gray-300 animate-pop">
               <div className="flex justify-between items-center mb-4">
-                <span className="text-xs font-bold text-white uppercase tracking-wider">Apps Script Setup</span>
-                <button 
-                  onClick={handleCopyCode} 
-                  className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all ${isCodeCopied ? 'bg-green-500 text-white' : 'bg-white text-black hover:bg-gray-200'}`}
-                >
+                <span className="text-[10px] font-bold text-white uppercase tracking-wider">Apps Script Setup</span>
+                <button onClick={handleCopyCode} className={`text-xs px-3 py-1.5 rounded-lg font-bold ${isCodeCopied ? 'bg-green-500 text-white' : 'bg-white text-black'}`}>
                   {isCodeCopied ? '✅ 복사됨' : '📋 코드 복사'}
                 </button>
               </div>
-              <ol className="text-xs space-y-2 mb-4 list-decimal list-inside text-gray-400">
-                <li>구글 시트 메뉴에서 <span className="text-white font-bold">[확장 프로그램] &gt; [Apps Script]</span> 실행</li>
-                <li>기존 코드를 모두 지우고, 위 버튼으로 복사한 코드를 붙여넣기</li>
-                <li>디스켓 아이콘(💾)을 눌러 저장</li>
-                <li>우측 상단 <span className="text-white font-bold">[배포] &gt; [새 배포]</span> 클릭</li>
-                <li>유형을 톱니바퀴 눌러 <strong>[웹 앱]</strong> 선택</li>
-                <li>설명: 입력 자유, <strong>액세스 권한: [모든 사용자]</strong> (필수!)</li>
-                <li>[배포] 클릭 후 승인하고, 생성된 URL을 위 칸에 붙여넣기</li>
+              <ol className="text-xs space-y-2 list-decimal list-inside text-gray-400">
+                <li>구글 시트 메뉴: [확장 프로그램] &gt; [Apps Script]</li>
+                <li>위 코드를 복사하여 붙여넣기 후 저장</li>
+                <li>[배포] &gt; [새 배포] &gt; 유형: [웹 앱]</li>
+                <li>액세스 권한: <strong>[모든 사용자]</strong> 선택 후 배포</li>
+                <li>생성된 URL을 위 칸에 붙여넣기</li>
               </ol>
             </div>
           )}
         </div>
 
         {/* 2-3. 배포 주소 설정 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md ring-2 ring-indigo-50">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
            <div className="flex justify-between items-start mb-4">
              <div>
-               <label className="text-sm font-bold text-indigo-700 block mb-1">3. 사이트 주소 설정 (필수)</label>
-               <p className="text-xs text-gray-600">
-                 학생들이 접속할 <strong>공개 도메인(Production Domain)</strong>을 입력하세요.
-               </p>
+               <label className="text-sm font-bold text-indigo-700 block mb-1">3. 사이트 주소 설정</label>
+               <p className="text-xs text-gray-600">현재 Vercel에 배포된 사이트 주소를 입력하세요.</p>
              </div>
-             <button 
-               onClick={() => handleBaseUrlChange(window.location.origin)}
-               className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
-             >
-               현재 주소 입력
-             </button>
+             <button onClick={() => handleBaseUrlChange(window.location.origin)} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-bold">현재 주소</button>
            </div>
-           
-           {/* Troubleshooting Help */}
-           <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
-               <h4 className="text-red-800 font-bold text-sm mb-2">🚨 "Log in to Vercel" 해결 방법 (필독)</h4>
-               <ol className="text-xs text-red-700 space-y-3 list-decimal list-inside font-medium">
-                 <li>
-                   <strong>화면에 'Standard Protection'이라고 뜨나요?</strong><br/>
-                   이건 <span className="bg-red-100 px-1 font-black">로그인 보안이 켜져 있다</span>는 뜻입니다!<br/>
-                   (상단의 'Default Protection' 토글은 새 프로젝트용이라, 기존 프로젝트는 안 꺼집니다.)
-                 </li>
-                 <li>
-                   <strong>이렇게 끄세요 (순서대로):</strong><br/>
-                   1. Vercel 목록에서 <strong>프로젝트 이름(voca)을 클릭</strong>해서 들어갑니다.<br/>
-                   2. 상단 <strong>[Settings]</strong> 탭 클릭<br/>
-                   3. 왼쪽 메뉴 <strong>[Deployment Protection]</strong> 클릭<br/>
-                   4. <strong>[Vercel Authentication]</strong>을 <strong>Disabled</strong>로 변경하고 <strong>Save</strong>.
-                 </li>
-                 <li>
-                   <strong>주소 입력:</strong><br/>
-                   아래 칸에 <span className="bg-white px-1 py-0.5 rounded border border-red-200 select-all font-mono">aiden8584-ops-projects.vercel.app</span> 을 입력하세요.
-                 </li>
-               </ol>
-           </div>
-
-           <div className="space-y-2">
-             <input 
-                type="text" 
-                value={baseUrl} 
-                onChange={(e) => handleBaseUrlChange(e.target.value)} 
-                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono placeholder-gray-300 ${isPreviewUrl ? 'border-red-300 bg-red-50 text-red-700' : 'border-indigo-100 text-gray-700 bg-white'}`}
-                placeholder="예: https://aiden8584-ops-projects.vercel.app"
-              />
-              {isPreviewUrl && (
-                <p className="text-xs text-red-600 font-bold animate-pulse">
-                  🚨 주의: 입력하신 주소는 테스트용(Preview) 주소로 보입니다. 학생들에게 "로그인 하세요" 창이 뜰 수 있습니다.
-                </p>
-              )}
-              {baseUrl && baseUrl.includes("localhost") && (
-                <p className="text-xs text-orange-500 font-bold">
-                  ⚠️ localhost 주소는 다른 사람(학생)이 접속할 수 없습니다. 배포된 Vercel 주소를 입력해주세요.
-                </p>
-              )}
-           </div>
+           <input 
+              type="text" 
+              value={baseUrl} 
+              onChange={(e) => handleBaseUrlChange(e.target.value)} 
+              className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+              placeholder="예: https://my-voca-app.vercel.app"
+            />
         </div>
       </div>
     </div>
