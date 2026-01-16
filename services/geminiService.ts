@@ -58,17 +58,20 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
     I have a vocabulary list for a test. 
     SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-    Task: Create a multiple-choice test based strictly on this source data.
+    Task: Create a CHALLENGING multiple-choice test based strictly on this source data.
     
     For each item in the source data:
     1. Use the 'word' as the question.
     2. Use the 'meaning' as the strictly Correct Answer.
     
-    STRICT RULES FOR PREVENTING AMBIGUITY (CRITICAL):
-    - Generate 3 distractors that are plausible in terms of part-of-speech but SEMANTICALLY DISTANT from the correct answer.
-    - DO NOT use synonyms, near-synonyms, or words with overlapping meanings.
-    - Ensure there is absolutely NO overlap in meaning between any of the 4 options.
-    
+    CRITICAL INSTRUCTIONS FOR GENERATING DISTRACTORS (Difficulty: HARD):
+    1. **Part of Speech Consistency**: The 3 distractors MUST match the part of speech of the correct answer exactly. (e.g., if the answer is a noun, all distractors must be nouns. If it's a verb ending in '다', all must end in '다').
+    2. **Semantic Plausibility**: Do NOT use completely unrelated or random words. Use meanings that a student might reasonably confuse with the correct word.
+       - Use meanings of words that look similar in spelling to the target word.
+       - Use meanings related to the same conceptual domain.
+    3. **Avoid Obviousness**: Ensure the distractors are similar in length and tone to the correct answer.
+    4. **Uniqueness**: While being tricky, ensure the Correct Answer is still the ONLY logically correct option. Do not use synonyms of the correct answer.
+
     3. Randomly shuffle the position of the correct answer among the 4 options.
     4. 'correctAnswerIndex' must point to the correct meaning in the 'options' array.
 
