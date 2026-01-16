@@ -7,7 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.6 (Link Fix)";
+const APP_VERSION = "v1.7 (No Auth)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
@@ -82,6 +82,7 @@ const TeacherDashboard: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
   
   const [showScriptGuide, setShowScriptGuide] = useState(false);
+  const [showVercelHelp, setShowVercelHelp] = useState(false);
   const [isCodeCopied, setIsCodeCopied] = useState(false);
   const [autoCorrected, setAutoCorrected] = useState<string | null>(null);
 
@@ -103,7 +104,6 @@ const TeacherDashboard: React.FC = () => {
     } else {
       const currentUrl = window.location.origin + window.location.pathname;
       // If localhost, force user to input their real deployed URL
-      // (Using a hardcoded preset can cause "Login to Vercel" errors if that project is deleted/private)
       if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
         setBaseUrl("");
       } else {
@@ -181,12 +181,9 @@ const TeacherDashboard: React.FC = () => {
     // URL Construction Logic (Robust)
     let url = baseUrl.trim();
     
-    // If empty (e.g. on localhost without manual input), fallback to origin but warn user implicitly by the result
     if (!url) {
         const current = window.location.origin + window.location.pathname;
         if (current.includes('localhost') || current.includes('127.0.0.1')) {
-           // If still empty on localhost, user hasn't set it. 
-           // We'll return an empty string to disable the button until they set it.
            return "";
         }
         url = current;
@@ -438,19 +435,37 @@ const TeacherDashboard: React.FC = () => {
              <div>
                <label className="text-sm font-bold text-gray-700 block mb-1">3. 사이트 주소 설정 (Vercel 도메인)</label>
                <p className="text-xs text-gray-400">
-                 QR코드가 연결될 주소입니다. 
-                 <span className="text-indigo-600 font-bold ml-1">
-                   로컬(localhost)에서 작업 중이라면, Vercel 배포 후 받은 주소를 입력해야 QR이 작동합니다.
-                 </span>
+                 QR코드가 연결될 주소입니다. 학생이 접속할 실제 주소를 입력하세요.
                </p>
              </div>
-             <button 
-               onClick={() => handleBaseUrlChange(window.location.origin + window.location.pathname)}
-               className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
-             >
-               현재 주소 자동감지
-             </button>
+             <div className="flex items-center gap-2">
+               <button 
+                 onClick={() => setShowVercelHelp(!showVercelHelp)}
+                 className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 font-bold hover:bg-red-100 transition-colors"
+               >
+                 혹시 "Log in to Vercel"이 뜨나요?
+               </button>
+               <button 
+                 onClick={() => handleBaseUrlChange(window.location.origin + window.location.pathname)}
+                 className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
+               >
+                 현재 주소 자동감지
+               </button>
+             </div>
            </div>
+           
+           {/* Troubleshooting Help */}
+           {showVercelHelp && (
+             <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 animate-pop">
+               <h4 className="text-red-700 font-bold text-sm mb-2">🚨 학생들이 접속할 때 로그인 창이 뜬다면?</h4>
+               <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
+                 <li>입력한 주소가 <strong>Vercel Preview(테스트용)</strong> 주소인지 확인하세요. (보통 git-branch 이름이 포함됨)</li>
+                 <li>Vercel 프로젝트 설정에서 <strong>Deployment Protection</strong>이 켜져 있으면 로그인이 필요합니다.</li>
+                 <li><strong>해결 방법:</strong> Vercel 대시보드에서 해당 프로젝트의 [Settings] &gt; [Deployment Protection] &gt; <strong>Vercel Authentication</strong>을 끄거나, 정식 배포 도메인(Production)을 사용하세요.</li>
+               </ul>
+             </div>
+           )}
+
            <input 
               type="text" 
               value={baseUrl} 
@@ -458,6 +473,11 @@ const TeacherDashboard: React.FC = () => {
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-700 bg-white placeholder-gray-300"
               placeholder="예: https://my-english-app.vercel.app"
             />
+            {baseUrl && baseUrl.includes("localhost") && (
+              <p className="text-xs text-orange-500 mt-2 font-bold">
+                ⚠️ localhost 주소는 다른 사람(학생)이 접속할 수 없습니다. 배포된 Vercel 주소를 입력해주세요.
+              </p>
+            )}
         </div>
       </div>
     </div>
