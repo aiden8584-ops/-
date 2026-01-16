@@ -7,12 +7,13 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.12 (Auto Result Tab)";
+const APP_VERSION = "v1.13 (Single Result Tab)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
- * [VocaMaster 단어시험 채점 시스템 v1.12]
- * 업데이트 내용: 결과가 '반이름_결과' 탭에 자동으로 저장됩니다.
+ * [VocaMaster 단어시험 채점 시스템 v1.13]
+ * 업데이트 내용: 모든 결과가 '결과' 탭 하나에 통합되어 저장됩니다.
+ * (반 정보는 첫 번째 열에 자동으로 기록됩니다)
  * ---------------------------------------------------------
  */
 
@@ -29,23 +30,23 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 중요: 결과는 원본 시트가 아닌 '[반이름]_결과' 탭에 저장합니다.
-    var originTabName = data.tabName || "Unknown";
-    var resultTabName = originTabName + "_결과";
+    // 중요: 모든 결과는 '결과' 탭에 저장합니다.
+    var resultTabName = "결과";
     var sheet = ss.getSheetByName(resultTabName);
 
     // 결과 탭이 없으면 자동으로 생성합니다.
     if (!sheet) {
       sheet = ss.insertSheet(resultTabName);
-      // 헤더 추가
-      sheet.appendRow(["이름", "점수", "총점", "소요시간(초)", "시험날짜", "제출일시"]);
+      // 헤더 추가 (반 구분 컬럼 추가됨)
+      sheet.appendRow(["구분(반)", "이름", "점수", "총점", "소요시간(초)", "시험날짜", "제출일시"]);
       // 보기 좋게 1행 고정 및 볼드 처리
       sheet.setFrozenRows(1);
-      sheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#f3f4f6");
+      sheet.getRange(1, 1, 1, 7).setFontWeight("bold").setBackground("#f3f4f6");
     }
 
     // 결과 데이터 추가
     sheet.appendRow([
+      data.tabName || "Unknown", // 반 이름
       data.studentName,
       data.score,
       data.total,
@@ -362,7 +363,7 @@ const TeacherDashboard: React.FC = () => {
           <div className="flex justify-between items-start mb-4">
              <div>
                <label className="text-sm font-bold text-gray-700 block mb-1">1. 문제 데이터 시트 (Google Sheets)</label>
-               <p className="text-xs text-gray-400">단어와 뜻이 적힌 구글 스프레드시트 주소를 입력하세요. <br/><strong>결과도 이 시트의 '반이름_결과' 탭에 저장됩니다.</strong></p>
+               <p className="text-xs text-gray-400">단어와 뜻이 적힌 구글 스프레드시트 주소를 입력하세요. <br/><strong>결과도 이 시트의 '결과' 탭에 저장됩니다.</strong></p>
                {connectionStatus === 'success_manual' && (
                  <p className="text-xs text-orange-500 font-bold mt-2 animate-pulse">
                    ⚠️ 시트 탭 목록을 가져오지 못했습니다. 공유 설정에서 '링크가 있는 모든 사용자'가 선택되었는지 확인해주세요.
