@@ -7,7 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.8 (Public Domain Fix)";
+const APP_VERSION = "v1.9 (Auth Fix Guide)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
@@ -324,10 +324,10 @@ const TeacherDashboard: React.FC = () => {
               <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-4">
                 <p className="text-red-600 font-black text-xl mb-2">⚠️ QR 사용 불가</p>
                 <p className="text-gray-600 text-xs leading-tight">
-                  현재 설정된 주소가 <strong>테스트용(Preview)</strong>입니다.<br/>
-                  학생들은 이 주소로 접속하면 <br/><strong>"Log in to Vercel"</strong> 화면이 뜹니다.
+                  현재 입력된 주소는 <strong>임시 주소(Preview)</strong>입니다.<br/>
+                  학생들은 로그인해야만 볼 수 있습니다.
                 </p>
-                <p className="text-xs mt-2 text-indigo-600 font-bold">아래 3번 설정에서 올바른 주소를 입력하세요.</p>
+                <p className="text-xs mt-2 text-indigo-600 font-bold">Vercel에서 가장 짧은 주소를 사용하세요.</p>
               </div>
             )}
             {selectedClass && shareUrl ? (
@@ -463,16 +463,23 @@ const TeacherDashboard: React.FC = () => {
            </div>
            
            {/* Troubleshooting Help */}
-           <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
-               <h4 className="text-blue-800 font-bold text-sm mb-2">💡 "Log in to Vercel" 해결 방법</h4>
-               <ul className="text-xs text-blue-700 space-y-2 list-disc list-inside">
+           <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+               <h4 className="text-red-800 font-bold text-sm mb-2">🚨 "Log in to Vercel" 해결 방법 (필독)</h4>
+               <ol className="text-xs text-red-700 space-y-3 list-decimal list-inside font-medium">
                  <li>
-                   <strong>절대 테스트 주소 금지:</strong> 주소에 <code>-git-</code>이나 <code>vercel.app</code> 앞에 복잡한 문자가 있다면 <strong>개인용 테스트 주소</strong>입니다. 학생은 접속 불가합니다.
+                   <strong>어떤 주소를 써야 하나요?</strong><br/>
+                   보내주신 스크린샷의 <strong>첫 번째 주소</strong>를 쓰세요.<br/>
+                   👉 <span className="bg-white px-1 py-0.5 rounded border border-red-200 select-all">aiden8584-ops-projects.vercel.app</span>
                  </li>
                  <li>
-                   <strong>올바른 주소 찾기:</strong> Vercel 대시보드 &gt; 해당 프로젝트 &gt; <strong>Domains</strong>에 있는 가장 짧은 주소(예: <code>myapp.vercel.app</code>)를 아래에 입력하세요.
+                   <strong>그래도 로그인하라고 떠요!</strong><br/>
+                   Vercel 사이트에서 <strong>보안 설정을 꺼야 합니다.</strong><br/>
+                   1. Vercel 접속 &gt; 해당 프로젝트 클릭<br/>
+                   2. 상단 <strong>[Settings]</strong> 탭 클릭<br/>
+                   3. 왼쪽 메뉴 <strong>[Deployment Protection]</strong> 클릭<br/>
+                   4. <strong>[Vercel Authentication]</strong>을 찾아서 <strong>Disabled(끄기)</strong>로 변경하고 저장(Save).
                  </li>
-               </ul>
+               </ol>
            </div>
 
            <div className="space-y-2">
@@ -481,7 +488,7 @@ const TeacherDashboard: React.FC = () => {
                 value={baseUrl} 
                 onChange={(e) => handleBaseUrlChange(e.target.value)} 
                 className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono placeholder-gray-300 ${isPreviewUrl ? 'border-red-300 bg-red-50 text-red-700' : 'border-indigo-100 text-gray-700 bg-white'}`}
-                placeholder="예: https://my-english-app.vercel.app"
+                placeholder="예: https://aiden8584-ops-projects.vercel.app"
               />
               {isPreviewUrl && (
                 <p className="text-xs text-red-600 font-bold animate-pulse">
