@@ -7,7 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.5 (Final Fix)";
+const APP_VERSION = "v1.5 (Build Fix)";
 // User's Vercel Domain
 const PRESET_DOMAIN = "https://voca-git-main-aiden8584-ops-projects.vercel.app";
 
@@ -347,7 +347,7 @@ const TeacherDashboard: React.FC = () => {
                )}
                {connectionStatus === 'fail' && (
                  <p className="text-xs text-red-500 font-bold mt-2 animate-pulse">
-                   ❌ 시트에 접근할 수 없습니다. 시트 우측 상단 [공유] 버튼 > '링크가 있는 모든 사용자' 선택 > [링크 복사]를 해주세요.
+                   ❌ 시트에 접근할 수 없습니다. 시트 우측 상단 [공유] 버튼 &gt; '링크가 있는 모든 사용자' 선택 &gt; [링크 복사]를 해주세요.
                  </p>
                )}
              </div>

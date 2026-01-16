@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types.ts';
+import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types';
 import Landing from './views/Landing';
 import Quiz from './views/Quiz';
 import Result from './views/Result';
 import TeacherDashboard from './views/TeacherDashboard';
 import IncorrectNote from './views/IncorrectNote';
-import { generateQuizQuestions } from './services/geminiService.ts';
-import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService.ts';
+import { generateQuizQuestions } from './services/geminiService';
+import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
 
 const RESULT_STORAGE_KEY = 'vocamaster_results';
 const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
