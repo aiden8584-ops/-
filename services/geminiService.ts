@@ -14,32 +14,52 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 /**
  * Generates a quiz locally using sheet words as distractors.
- * This is used as a fallback when Gemini API hits quota limits.
+ * Used as fallback.
+ * Logic: 25 Eng->Kor, 25 Kor->Eng
  */
 const generateLocalQuiz = (sheetWords: SheetWord[]): Question[] => {
   const shuffledSource = shuffleArray(sheetWords);
   const limitedWords = shuffledSource.slice(0, 50);
   
-  // All meanings in the list to be used as distractor source
-  const allMeanings = sheetWords.map(sw => sw.meaning);
+  // Split into two sets
+  const engToKorSet = limitedWords.slice(0, 25);
+  const korToEngSet = limitedWords.slice(25, 50);
 
-  return limitedWords.map((sw, idx) => {
+  // Pools for distractors
+  const allMeanings = sheetWords.map(sw => sw.meaning);
+  const allWords = sheetWords.map(sw => sw.word);
+
+  const questionsA: Question[] = engToKorSet.map((sw, idx) => {
     const correctMeaning = sw.meaning;
-    
-    // Pick 3 random meanings from the rest of the list
+    // Filter out the correct answer from distractors
     const otherMeanings = allMeanings.filter(m => m !== correctMeaning);
     const distractors = shuffleArray(otherMeanings).slice(0, 3);
-    
-    // Combine and shuffle options
     const options = shuffleArray([correctMeaning, ...distractors]);
     
     return {
       id: idx,
-      word: sw.word,
-      options,
+      word: sw.word, // Show English
+      options,       // Select Korean
       correctAnswerIndex: options.indexOf(correctMeaning)
     };
   });
+
+  const questionsB: Question[] = korToEngSet.map((sw, idx) => {
+    const correctWord = sw.word;
+    // Filter out the correct answer from distractors
+    const otherWords = allWords.filter(w => w !== correctWord);
+    const distractors = shuffleArray(otherWords).slice(0, 3);
+    const options = shuffleArray([correctWord, ...distractors]);
+
+    return {
+      id: 25 + idx,
+      word: sw.meaning, // Show Korean
+      options,          // Select English
+      correctAnswerIndex: options.indexOf(correctWord)
+    };
+  });
+
+  return [...questionsA, ...questionsB];
 };
 
 export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord[]): Promise<Question[]> => {
@@ -58,22 +78,24 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
     I have a vocabulary list for a test. 
     SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-    Task: Create a CHALLENGING multiple-choice test based strictly on this source data.
+    Task: Create a test with exactly 50 questions based on the source data.
     
-    For each item in the source data:
-    1. Use the 'word' as the question.
-    2. Use the 'meaning' as the strictly Correct Answer.
-    
-    CRITICAL INSTRUCTIONS FOR GENERATING DISTRACTORS (Difficulty: HARD):
-    1. **Part of Speech Consistency**: The 3 distractors MUST match the part of speech of the correct answer exactly. (e.g., if the answer is a noun, all distractors must be nouns. If it's a verb ending in '다', all must end in '다').
-    2. **Semantic Plausibility**: Do NOT use completely unrelated or random words. Use meanings that a student might reasonably confuse with the correct word.
-       - Use meanings of words that look similar in spelling to the target word.
-       - Use meanings related to the same conceptual domain.
-    3. **Avoid Obviousness**: Ensure the distractors are similar in length and tone to the correct answer.
-    4. **Uniqueness**: While being tricky, ensure the Correct Answer is still the ONLY logically correct option. Do not use synonyms of the correct answer.
+    STRUCTURE:
+    1. **Questions 1-25 (Eng -> Kor)**: 
+       - Question: English 'word'.
+       - Options: 4 Korean 'meanings'.
+    2. **Questions 26-50 (Kor -> Eng)**: 
+       - Question: Korean 'meaning'.
+       - Options: 4 English 'words'.
 
-    3. Randomly shuffle the position of the correct answer among the 4 options.
-    4. 'correctAnswerIndex' must point to the correct meaning in the 'options' array.
+    CRITICAL RULES FOR OPTIONS (DISTRACTORS):
+    1. **NO AMBIGUITY**: The Correct Answer must be CLEARLY distinct.
+    2. **NO SYNONYMS**: Do NOT use distractors that are synonyms or have very similar meanings to the correct answer (e.g., if answer is '명확한', do NOT use '분명한' as a distractor).
+    3. **Mix Types**: 
+       - For Eng->Kor, options must be Korean.
+       - For Kor->Eng, options must be English.
+    4. **Shuffle**: Randomly shuffle the position of the correct answer among the 4 options.
+    5. **Index**: 'correctAnswerIndex' must point to the correct option.
 
     Return the result as a JSON array of Question objects.
   `;
@@ -110,7 +132,6 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
     return JSON.parse(text) as Question[];
 
   } catch (error: any) {
-    // Prevent triggering Google Login/Key selection prompt
     console.warn("Gemini API Error. Falling back to local generation:", error.message);
     return generateLocalQuiz(sheetWords);
   }

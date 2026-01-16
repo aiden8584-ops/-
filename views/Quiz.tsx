@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Question } from '../types';
 import Button from '../components/Button';
@@ -111,10 +112,10 @@ const Quiz: React.FC<QuizProps> = ({ questions, onComplete }) => {
       {/* Question Card */}
       <div className={`bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-transform duration-200 ${shake ? 'animate-shake' : ''}`}>
         <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 p-10 text-center">
-          <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-sm">
+          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight drop-shadow-sm leading-tight break-keep">
             {currentQuestion.word}
           </h2>
-          <p className="text-indigo-100 mt-2 text-sm font-medium">Choose the correct meaning</p>
+          <p className="text-indigo-100 mt-3 text-sm font-medium">Choose the correct answer</p>
         </div>
 
         <div className="p-6 grid gap-4">
@@ -125,7 +126,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onComplete }) => {
               onClick={() => handleOptionClick(idx)}
               className={`w-full text-left px-6 py-4 rounded-xl border-2 transition-all duration-200 flex items-center justify-between group ${getButtonClass(idx)}`}
             >
-              <span className="text-lg">{option}</span>
+              <span className="text-lg font-medium">{option}</span>
               {isAnswered && idx === currentQuestion.correctAnswerIndex && (
                  <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
