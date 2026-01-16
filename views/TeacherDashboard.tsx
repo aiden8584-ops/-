@@ -1,6 +1,8 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import Button from '../components/Button';
 import { fetchSheetTabs, checkSheetAvailability } from '../services/sheetService';
+import { APP_CONFIG } from '../config';
 
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
@@ -91,9 +93,10 @@ const TeacherDashboard: React.FC = () => {
   const [autoCorrected, setAutoCorrected] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedSheetId = localStorage.getItem(SHEET_ID_KEY) || '';
-    const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || '';
-    const storedBaseUrl = localStorage.getItem(BASE_URL_KEY) || '';
+    // Priority: LocalStorage > Config File
+    const storedSheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
+    const storedScriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || APP_CONFIG.scriptUrl;
+    const storedBaseUrl = localStorage.getItem(BASE_URL_KEY) || APP_CONFIG.baseUrl;
 
     setSheetId(storedSheetId);
     setScriptUrl(sanitizeInput(storedScriptUrl));
@@ -107,7 +110,7 @@ const TeacherDashboard: React.FC = () => {
       setBaseUrl(sanitizeInput(storedBaseUrl));
     } else {
       const currentUrl = window.location.origin + window.location.pathname;
-      // If localhost, force user to input their real deployed URL
+      // If localhost, force user to input their real deployed URL unless config has it
       if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
         setBaseUrl("");
       } else {
@@ -230,6 +233,11 @@ const TeacherDashboard: React.FC = () => {
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-black text-gray-900 tracking-tight">선생님 관리 대시보드</h2>
         <p className="text-gray-500 text-sm">학생들에게 배포할 시험 링크를 생성하고 시스템을 설정합니다.</p>
+        {(APP_CONFIG.sheetId || APP_CONFIG.scriptUrl) && (
+           <p className="text-xs text-indigo-600 font-bold bg-indigo-50 inline-block px-3 py-1 rounded-full">
+             💡 영구 설정 파일(config.ts)의 값을 불러왔습니다.
+           </p>
+        )}
       </div>
 
       {/* 1. QR 배포 섹션 */}

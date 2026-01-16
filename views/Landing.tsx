@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import Button from '../components/Button';
 import { AppView } from '../types';
 import { fetchSheetTabs } from '../services/sheetService';
+import { APP_CONFIG } from '../config';
 
 interface LandingProps {
   onStart: (name: string, className: string, date: string) => void;
@@ -40,6 +42,10 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       if (storedSheetId) {
         setHasSheetId(true);
         loadTabs(storedSheetId);
+      } else if (APP_CONFIG.sheetId) {
+        // Fallback to Hardcoded Config
+        setHasSheetId(true);
+        loadTabs(APP_CONFIG.sheetId);
       }
     }
 

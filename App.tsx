@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types';
 import Landing from './views/Landing';
@@ -7,6 +8,7 @@ import TeacherDashboard from './views/TeacherDashboard';
 import IncorrectNote from './views/IncorrectNote';
 import { generateQuizQuestions } from './services/geminiService';
 import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
+import { APP_CONFIG } from './config';
 
 const RESULT_STORAGE_KEY = 'vocamaster_results';
 const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
@@ -47,7 +49,9 @@ function App() {
     localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
     setLastResult(result);
 
-    const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY);
+    // Check localStorage first, then fallback to config
+    const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || APP_CONFIG.scriptUrl;
+    
     if (scriptUrl) {
       setSubmissionStatus('submitting');
       submitResultToSheet(scriptUrl, result).then(success => {
@@ -116,7 +120,9 @@ function App() {
     setSubmissionStatus('idle');
     
     try {
-      const sheetId = localStorage.getItem(SHEET_ID_KEY);
+      // Check localStorage first, then fallback to config
+      const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
+      
       if (!sheetId) {
         throw new Error("선생님 설정이 완료되지 않았습니다. 시트 ID를 입력해주세요.");
       }
