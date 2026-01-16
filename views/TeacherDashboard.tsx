@@ -7,7 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.7 (No Auth)";
+const APP_VERSION = "v1.8 (Public Domain Fix)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
@@ -82,7 +82,6 @@ const TeacherDashboard: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
   
   const [showScriptGuide, setShowScriptGuide] = useState(false);
-  const [showVercelHelp, setShowVercelHelp] = useState(false);
   const [isCodeCopied, setIsCodeCopied] = useState(false);
   const [autoCorrected, setAutoCorrected] = useState<string | null>(null);
 
@@ -169,6 +168,13 @@ const TeacherDashboard: React.FC = () => {
     setIsCodeCopied(true);
     setTimeout(() => setIsCodeCopied(false), 2000);
   };
+
+  // Detect potentially private Vercel Preview URLs
+  const isPreviewUrl = useMemo(() => {
+    if (!baseUrl) return false;
+    // Check for patterns like 'app-git-branch-user.vercel.app' or double dashes which often indicate preview deployments
+    return baseUrl.includes('.vercel.app') && (baseUrl.includes('-git-') || (baseUrl.match(/-/g) || []).length > 2);
+  }, [baseUrl]);
 
   const shareUrl = useMemo(() => {
     if (!sheetId) return "";
@@ -313,7 +319,17 @@ const TeacherDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+          <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 relative">
+            {isPreviewUrl && (
+              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-4">
+                <p className="text-red-600 font-black text-xl mb-2">⚠️ QR 사용 불가</p>
+                <p className="text-gray-600 text-xs leading-tight">
+                  현재 설정된 주소가 <strong>테스트용(Preview)</strong>입니다.<br/>
+                  학생들은 이 주소로 접속하면 <br/><strong>"Log in to Vercel"</strong> 화면이 뜹니다.
+                </p>
+                <p className="text-xs mt-2 text-indigo-600 font-bold">아래 3번 설정에서 올바른 주소를 입력하세요.</p>
+              </div>
+            )}
             {selectedClass && shareUrl ? (
               <>
                 <div className="bg-white p-2 rounded-xl shadow-sm mb-3">
@@ -430,54 +446,54 @@ const TeacherDashboard: React.FC = () => {
         </div>
 
         {/* 2-3. 배포 주소 설정 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md ring-2 ring-indigo-50">
            <div className="flex justify-between items-start mb-4">
              <div>
-               <label className="text-sm font-bold text-gray-700 block mb-1">3. 사이트 주소 설정 (Vercel 도메인)</label>
-               <p className="text-xs text-gray-400">
-                 QR코드가 연결될 주소입니다. 학생이 접속할 실제 주소를 입력하세요.
+               <label className="text-sm font-bold text-indigo-700 block mb-1">3. 사이트 주소 설정 (필수)</label>
+               <p className="text-xs text-gray-600">
+                 학생들이 접속할 <strong>공개 도메인(Production Domain)</strong>을 입력하세요.
                </p>
              </div>
-             <div className="flex items-center gap-2">
-               <button 
-                 onClick={() => setShowVercelHelp(!showVercelHelp)}
-                 className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 font-bold hover:bg-red-100 transition-colors"
-               >
-                 혹시 "Log in to Vercel"이 뜨나요?
-               </button>
-               <button 
-                 onClick={() => handleBaseUrlChange(window.location.origin + window.location.pathname)}
-                 className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
-               >
-                 현재 주소 자동감지
-               </button>
-             </div>
+             <button 
+               onClick={() => handleBaseUrlChange(window.location.origin)}
+               className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-bold transition-colors"
+             >
+               현재 주소 입력
+             </button>
            </div>
            
            {/* Troubleshooting Help */}
-           {showVercelHelp && (
-             <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 animate-pop">
-               <h4 className="text-red-700 font-bold text-sm mb-2">🚨 학생들이 접속할 때 로그인 창이 뜬다면?</h4>
-               <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
-                 <li>입력한 주소가 <strong>Vercel Preview(테스트용)</strong> 주소인지 확인하세요. (보통 git-branch 이름이 포함됨)</li>
-                 <li>Vercel 프로젝트 설정에서 <strong>Deployment Protection</strong>이 켜져 있으면 로그인이 필요합니다.</li>
-                 <li><strong>해결 방법:</strong> Vercel 대시보드에서 해당 프로젝트의 [Settings] &gt; [Deployment Protection] &gt; <strong>Vercel Authentication</strong>을 끄거나, 정식 배포 도메인(Production)을 사용하세요.</li>
+           <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+               <h4 className="text-blue-800 font-bold text-sm mb-2">💡 "Log in to Vercel" 해결 방법</h4>
+               <ul className="text-xs text-blue-700 space-y-2 list-disc list-inside">
+                 <li>
+                   <strong>절대 테스트 주소 금지:</strong> 주소에 <code>-git-</code>이나 <code>vercel.app</code> 앞에 복잡한 문자가 있다면 <strong>개인용 테스트 주소</strong>입니다. 학생은 접속 불가합니다.
+                 </li>
+                 <li>
+                   <strong>올바른 주소 찾기:</strong> Vercel 대시보드 &gt; 해당 프로젝트 &gt; <strong>Domains</strong>에 있는 가장 짧은 주소(예: <code>myapp.vercel.app</code>)를 아래에 입력하세요.
+                 </li>
                </ul>
-             </div>
-           )}
+           </div>
 
-           <input 
-              type="text" 
-              value={baseUrl} 
-              onChange={(e) => handleBaseUrlChange(e.target.value)} 
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-700 bg-white placeholder-gray-300"
-              placeholder="예: https://my-english-app.vercel.app"
-            />
-            {baseUrl && baseUrl.includes("localhost") && (
-              <p className="text-xs text-orange-500 mt-2 font-bold">
-                ⚠️ localhost 주소는 다른 사람(학생)이 접속할 수 없습니다. 배포된 Vercel 주소를 입력해주세요.
-              </p>
-            )}
+           <div className="space-y-2">
+             <input 
+                type="text" 
+                value={baseUrl} 
+                onChange={(e) => handleBaseUrlChange(e.target.value)} 
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono placeholder-gray-300 ${isPreviewUrl ? 'border-red-300 bg-red-50 text-red-700' : 'border-indigo-100 text-gray-700 bg-white'}`}
+                placeholder="예: https://my-english-app.vercel.app"
+              />
+              {isPreviewUrl && (
+                <p className="text-xs text-red-600 font-bold animate-pulse">
+                  🚨 주의: 입력하신 주소는 테스트용(Preview) 주소로 보입니다. 학생들에게 "로그인 하세요" 창이 뜰 수 있습니다.
+                </p>
+              )}
+              {baseUrl && baseUrl.includes("localhost") && (
+                <p className="text-xs text-orange-500 font-bold">
+                  ⚠️ localhost 주소는 다른 사람(학생)이 접속할 수 없습니다. 배포된 Vercel 주소를 입력해주세요.
+                </p>
+              )}
+           </div>
         </div>
       </div>
     </div>
