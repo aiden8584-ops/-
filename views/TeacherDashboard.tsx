@@ -7,9 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.5 (Build Fix)";
-// User's Vercel Domain
-const PRESET_DOMAIN = "https://voca-git-main-aiden8584-ops-projects.vercel.app";
+const APP_VERSION = "v1.6 (Link Fix)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
@@ -104,8 +102,10 @@ const TeacherDashboard: React.FC = () => {
       setBaseUrl(sanitizeInput(storedBaseUrl));
     } else {
       const currentUrl = window.location.origin + window.location.pathname;
+      // If localhost, force user to input their real deployed URL
+      // (Using a hardcoded preset can cause "Login to Vercel" errors if that project is deleted/private)
       if (currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1')) {
-        setBaseUrl(PRESET_DOMAIN);
+        setBaseUrl("");
       } else {
         setBaseUrl(currentUrl);
       }
@@ -181,9 +181,15 @@ const TeacherDashboard: React.FC = () => {
     // URL Construction Logic (Robust)
     let url = baseUrl.trim();
     
+    // If empty (e.g. on localhost without manual input), fallback to origin but warn user implicitly by the result
     if (!url) {
         const current = window.location.origin + window.location.pathname;
-        url = current.includes('localhost') ? PRESET_DOMAIN : current;
+        if (current.includes('localhost') || current.includes('127.0.0.1')) {
+           // If still empty on localhost, user hasn't set it. 
+           // We'll return an empty string to disable the button until they set it.
+           return "";
+        }
+        url = current;
     }
     
     url = url.replace(/\/$/, '');
@@ -280,8 +286,8 @@ const TeacherDashboard: React.FC = () => {
               <div className="mb-2">
                  <input 
                    readOnly
-                   value={shareUrl || "설정 후 생성됩니다"}
-                   className="w-full text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono break-all"
+                   value={shareUrl || "아래 3번에서 사이트 주소를 설정해주세요"}
+                   className={`w-full text-xs border rounded-lg p-3 font-mono break-all ${!shareUrl ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}
                  />
               </div>
 
@@ -311,7 +317,7 @@ const TeacherDashboard: React.FC = () => {
           </div>
 
           <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-            {selectedClass ? (
+            {selectedClass && shareUrl ? (
               <>
                 <div className="bg-white p-2 rounded-xl shadow-sm mb-3">
                    <img src={qrUrl} alt="QR" className="w-40 h-40 mix-blend-multiply" />
@@ -320,7 +326,7 @@ const TeacherDashboard: React.FC = () => {
               </>
             ) : (
               <div className="w-40 h-40 flex items-center justify-center text-gray-300 text-center text-xs font-medium">
-                왼쪽에서 반을<br/>선택(입력)해주세요
+                {!shareUrl ? "사이트 주소를\n입력해주세요" : "왼쪽에서 반을\n선택해주세요"}
               </div>
             )}
           </div>
@@ -434,7 +440,7 @@ const TeacherDashboard: React.FC = () => {
                <p className="text-xs text-gray-400">
                  QR코드가 연결될 주소입니다. 
                  <span className="text-indigo-600 font-bold ml-1">
-                   'https://...'가 없어도 자동으로 붙여줍니다. Vercel 주소를 이곳에 붙여넣으세요.
+                   로컬(localhost)에서 작업 중이라면, Vercel 배포 후 받은 주소를 입력해야 QR이 작동합니다.
                  </span>
                </p>
              </div>
@@ -450,7 +456,7 @@ const TeacherDashboard: React.FC = () => {
               value={baseUrl} 
               onChange={(e) => handleBaseUrlChange(e.target.value)} 
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono text-gray-700 bg-white placeholder-gray-300"
-              placeholder={`예: ${PRESET_DOMAIN}`}
+              placeholder="예: https://my-english-app.vercel.app"
             />
         </div>
       </div>
