@@ -7,7 +7,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 
 // Deployment Version Indicator
-const APP_VERSION = "v1.9 (Auth Fix Guide)";
+const APP_VERSION = "v1.11 (Result Link Added)";
 
 const GAS_CODE_SNIPPET = `/**
  * ---------------------------------------------------------
@@ -358,7 +358,7 @@ const TeacherDashboard: React.FC = () => {
           <div className="flex justify-between items-start mb-4">
              <div>
                <label className="text-sm font-bold text-gray-700 block mb-1">1. 문제 데이터 시트 (Google Sheets)</label>
-               <p className="text-xs text-gray-400">단어와 뜻이 적힌 구글 스프레드시트 주소를 입력하세요.</p>
+               <p className="text-xs text-gray-400">단어와 뜻이 적힌 구글 스프레드시트 주소를 입력하세요. <br/><strong>결과도 이 시트에 자동으로 저장됩니다.</strong></p>
                {connectionStatus === 'success_manual' && (
                  <p className="text-xs text-orange-500 font-bold mt-2 animate-pulse">
                    ⚠️ 시트 탭 목록을 가져오지 못했습니다. 공유 설정에서 '링크가 있는 모든 사용자'가 선택되었는지 확인해주세요.
@@ -384,7 +384,17 @@ const TeacherDashboard: React.FC = () => {
               }`}
               placeholder="https://docs.google.com/spreadsheets/d/..."
             />
-            <button onClick={() => loadTabs(sheetId)} className="bg-gray-800 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-black transition-colors">
+            {sheetId && (
+              <a 
+                href={`https://docs.google.com/spreadsheets/d/${sheetId}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 transition-colors flex items-center"
+              >
+                📂 결과 시트 열기
+              </a>
+            )}
+            <button onClick={() => loadTabs(sheetId)} className="bg-gray-800 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-black transition-colors whitespace-nowrap">
               연결 확인
             </button>
           </div>
@@ -467,17 +477,20 @@ const TeacherDashboard: React.FC = () => {
                <h4 className="text-red-800 font-bold text-sm mb-2">🚨 "Log in to Vercel" 해결 방법 (필독)</h4>
                <ol className="text-xs text-red-700 space-y-3 list-decimal list-inside font-medium">
                  <li>
-                   <strong>어떤 주소를 써야 하나요?</strong><br/>
-                   보내주신 스크린샷의 <strong>첫 번째 주소</strong>를 쓰세요.<br/>
-                   👉 <span className="bg-white px-1 py-0.5 rounded border border-red-200 select-all">aiden8584-ops-projects.vercel.app</span>
+                   <strong>화면에 'Standard Protection'이라고 뜨나요?</strong><br/>
+                   이건 <span className="bg-red-100 px-1 font-black">로그인 보안이 켜져 있다</span>는 뜻입니다!<br/>
+                   (상단의 'Default Protection' 토글은 새 프로젝트용이라, 기존 프로젝트는 안 꺼집니다.)
                  </li>
                  <li>
-                   <strong>그래도 로그인하라고 떠요!</strong><br/>
-                   Vercel 사이트에서 <strong>보안 설정을 꺼야 합니다.</strong><br/>
-                   1. Vercel 접속 &gt; 해당 프로젝트 클릭<br/>
+                   <strong>이렇게 끄세요 (순서대로):</strong><br/>
+                   1. Vercel 목록에서 <strong>프로젝트 이름(voca)을 클릭</strong>해서 들어갑니다.<br/>
                    2. 상단 <strong>[Settings]</strong> 탭 클릭<br/>
                    3. 왼쪽 메뉴 <strong>[Deployment Protection]</strong> 클릭<br/>
-                   4. <strong>[Vercel Authentication]</strong>을 찾아서 <strong>Disabled(끄기)</strong>로 변경하고 저장(Save).
+                   4. <strong>[Vercel Authentication]</strong>을 <strong>Disabled</strong>로 변경하고 <strong>Save</strong>.
+                 </li>
+                 <li>
+                   <strong>주소 입력:</strong><br/>
+                   아래 칸에 <span className="bg-white px-1 py-0.5 rounded border border-red-200 select-all font-mono">aiden8584-ops-projects.vercel.app</span> 을 입력하세요.
                  </li>
                </ol>
            </div>
