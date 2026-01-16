@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { AppView, UserSession, QuizResult, Question, IncorrectWord } from './types.ts';
-import Landing from './views/Landing.tsx';
-import Quiz from './views/Quiz.tsx';
-import Result from './views/Result.tsx';
-import TeacherDashboard from './views/TeacherDashboard.tsx';
-import IncorrectNote from './views/IncorrectNote.tsx';
+import Landing from './views/Landing';
+import Quiz from './views/Quiz';
+import Result from './views/Result';
+import TeacherDashboard from './views/TeacherDashboard';
+import IncorrectNote from './views/IncorrectNote';
 import { generateQuizQuestions } from './services/geminiService.ts';
 import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService.ts';
 
