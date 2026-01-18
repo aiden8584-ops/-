@@ -10,14 +10,18 @@
 
 export const APP_CONFIG = {
   // 1. 구글 시트 ID (URL의 /d/ 와 /edit 사이의 값)
-  // 예: "1xXyYzZ..."
   sheetId: "", 
   
-  // 2. Apps Script 배포 URL ( .../exec 로 끝나는 주소)
-  // 예: "https://script.google.com/macros/s/.../exec"
+  // 2. Apps Script 배포 URL
   scriptUrl: "",
   
   // 3. 배포된 사이트 주소
-  // 예: "https://voca-app.vercel.app"
-  baseUrl: ""
+  baseUrl: "",
+
+  // [기본 퀴즈 설정]
+  defaultSettings: {
+    totalQuestions: 50,
+    timeLimitPerQuestion: 0, // 0이면 무제한
+    questionType: "mixed" as const // "mixed", "engToKor", "korToEng"
+  }
 };

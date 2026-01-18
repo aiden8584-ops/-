@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Question, SheetWord } from "../types";
+import { Question, SheetWord, QuizSettings } from "../types";
 
 // Helper to shuffle array (Fisher-Yates)
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -14,56 +14,50 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 /**
  * Generates a quiz locally using sheet words as distractors.
- * Used as fallback.
- * Logic: 25 Eng->Kor, 25 Kor->Eng
+ * Fallback mechanism.
  */
-const generateLocalQuiz = (sheetWords: SheetWord[]): Question[] => {
+const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Question[] => {
+  const total = Math.min(sheetWords.length, settings.totalQuestions);
   const shuffledSource = shuffleArray(sheetWords);
-  const limitedWords = shuffledSource.slice(0, 50);
+  const limitedWords = shuffledSource.slice(0, total);
   
-  // Split into two sets
-  const engToKorSet = limitedWords.slice(0, 25);
-  const korToEngSet = limitedWords.slice(25, 50);
-
-  // Pools for distractors
   const allMeanings = sheetWords.map(sw => sw.meaning);
   const allWords = sheetWords.map(sw => sw.word);
 
-  const questionsA: Question[] = engToKorSet.map((sw, idx) => {
-    const correctMeaning = sw.meaning;
-    // Filter out the correct answer from distractors
-    const otherMeanings = allMeanings.filter(m => m !== correctMeaning);
-    const distractors = shuffleArray(otherMeanings).slice(0, 3);
-    const options = shuffleArray([correctMeaning, ...distractors]);
+  return limitedWords.map((sw, idx) => {
+    let showWord = '';
+    let correctAnswer = '';
+    let distractorsPool: string[] = [];
+    
+    // Determine type for this specific question
+    let currentType = settings.questionType;
+    if (currentType === 'mixed') {
+      currentType = idx < (total / 2) ? 'engToKor' : 'korToEng';
+    }
+
+    if (currentType === 'engToKor') {
+      showWord = sw.word;
+      correctAnswer = sw.meaning;
+      distractorsPool = allMeanings.filter(m => m !== correctAnswer);
+    } else {
+      showWord = sw.meaning;
+      correctAnswer = sw.word;
+      distractorsPool = allWords.filter(w => w !== correctAnswer);
+    }
+
+    const distractors = shuffleArray(distractorsPool).slice(0, 3);
+    const options = shuffleArray([correctAnswer, ...distractors]);
     
     return {
       id: idx,
-      word: sw.word, // Show English
-      options,       // Select Korean
-      correctAnswerIndex: options.indexOf(correctMeaning)
+      word: showWord,
+      options,
+      correctAnswerIndex: options.indexOf(correctAnswer)
     };
   });
-
-  const questionsB: Question[] = korToEngSet.map((sw, idx) => {
-    const correctWord = sw.word;
-    // Filter out the correct answer from distractors
-    const otherWords = allWords.filter(w => w !== correctWord);
-    const distractors = shuffleArray(otherWords).slice(0, 3);
-    const options = shuffleArray([correctWord, ...distractors]);
-
-    return {
-      id: 25 + idx,
-      word: sw.meaning, // Show Korean
-      options,          // Select English
-      correctAnswerIndex: options.indexOf(correctWord)
-    };
-  });
-
-  return [...questionsA, ...questionsB];
 };
 
-export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord[]): Promise<Question[]> => {
-  // CRITICAL: Instantiate inside function to use the most recent process.env.API_KEY
+export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?: SheetWord[]): Promise<Question[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = "gemini-3-flash-preview";
   
@@ -72,30 +66,24 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
   }
 
   const shuffled = shuffleArray(sheetWords);
-  const limitedWords = shuffled.slice(0, 50); 
+  const limitedWords = shuffled.slice(0, settings.totalQuestions); 
   
   const prompt = `
     I have a vocabulary list for a test. 
     SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-    Task: Create a test with exactly 50 questions based on the source data.
+    Task: Create a test with exactly ${settings.totalQuestions} questions.
     
-    STRUCTURE:
-    1. **Questions 1-25 (Eng -> Kor)**: 
-       - Question: English 'word'.
-       - Options: 4 Korean 'meanings'.
-    2. **Questions 26-50 (Kor -> Eng)**: 
-       - Question: Korean 'meaning'.
-       - Options: 4 English 'words'.
+    QUIZ TYPE SETTING: ${settings.questionType}
+    - If 'mixed': Split questions equally between (English Word -> Korean Meaning) and (Korean Meaning -> English Word).
+    - If 'engToKor': All questions must show English and ask for Korean meaning.
+    - If 'korToEng': All questions must show Korean and ask for English word.
 
     CRITICAL RULES FOR OPTIONS (DISTRACTORS):
     1. **NO AMBIGUITY**: The Correct Answer must be CLEARLY distinct.
-    2. **NO SYNONYMS**: Do NOT use distractors that are synonyms or have very similar meanings to the correct answer (e.g., if answer is '명확한', do NOT use '분명한' as a distractor).
-    3. **Mix Types**: 
-       - For Eng->Kor, options must be Korean.
-       - For Kor->Eng, options must be English.
-    4. **Shuffle**: Randomly shuffle the position of the correct answer among the 4 options.
-    5. **Index**: 'correctAnswerIndex' must point to the correct option.
+    2. **NO SYNONYMS**: Do NOT use distractors that are synonyms or have very similar meanings to the correct answer.
+    3. **Index**: 'correctAnswerIndex' must point to the correct option.
+    4. **Language**: Ensure distractors match the language of the correct answer.
 
     Return the result as a JSON array of Question objects.
   `;
@@ -120,7 +108,6 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
               correctAnswerIndex: { type: Type.INTEGER }
             },
             required: ["id", "word", "options", "correctAnswerIndex"],
-            propertyOrdering: ["id", "word", "options", "correctAnswerIndex"]
           },
         },
       },
@@ -133,6 +120,6 @@ export const generateQuizQuestions = async (date: string, sheetWords?: SheetWord
 
   } catch (error: any) {
     console.warn("Gemini API Error. Falling back to local generation:", error.message);
-    return generateLocalQuiz(sheetWords);
+    return generateLocalQuiz(sheetWords, settings);
   }
 };

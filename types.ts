@@ -1,8 +1,17 @@
+
 export interface Question {
   id: number;
   word: string;
   options: string[];
   correctAnswerIndex: number;
+}
+
+export type QuestionType = 'mixed' | 'engToKor' | 'korToEng';
+
+export interface QuizSettings {
+  totalQuestions: number;
+  timeLimitPerQuestion: number; // 0 for no limit
+  questionType: QuestionType;
 }
 
 export interface QuizResult {
@@ -39,6 +48,7 @@ export interface UserSession {
   name: string;
   className: string;
   testDate: string;
+  settings: QuizSettings;
 }
 
 export interface SheetWord {
