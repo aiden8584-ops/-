@@ -10,10 +10,10 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 const SETTINGS_KEY = 'vocamaster_quiz_settings';
 
-const APP_VERSION = "v1.15 (Quiz Customization)";
+const APP_VERSION = "v1.16 (Enhanced UI)";
 
 const GAS_CODE_SNIPPET = `/**
- * [VocaMaster 단어시험 채점 시스템 v1.15]
+ * [VocaMaster 단어시험 채점 시스템 v1.16]
  */
 function doGet(e) { return ContentService.createTextOutput("VocaMaster 연결 성공!"); }
 function doPost(e) {
@@ -185,18 +185,38 @@ const TeacherDashboard: React.FC = () => {
               )}
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. 링크 공유</label>
-              <div className="flex gap-2">
-                <input readOnly value={shareUrl} className="flex-1 text-xs border rounded-lg p-3 font-mono bg-gray-50" />
-                <Button onClick={() => { navigator.clipboard.writeText(shareUrl); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000); }}>{isCopied ? '✅' : '🔗'}</Button>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. 링크 공유 및 확인</label>
+              <div className="flex flex-col gap-2">
+                <input readOnly value={shareUrl} className="w-full text-xs border rounded-lg p-3 font-mono bg-gray-50 mb-1" />
+                <div className="flex gap-2">
+                  <Button 
+                    fullWidth 
+                    variant="primary" 
+                    onClick={() => { 
+                      navigator.clipboard.writeText(shareUrl); 
+                      setIsCopied(true); 
+                      setTimeout(() => setIsCopied(false), 2000); 
+                    }}
+                  >
+                    {isCopied ? '✅ 복사됨' : '🔗 링크 복사'}
+                  </Button>
+                  <a 
+                    href={shareUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg font-bold flex items-center justify-center hover:bg-indigo-100 transition-colors"
+                  >
+                    🌐 열기
+                  </a>
+                </div>
               </div>
             </div>
           </div>
           <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
             {selectedClass && shareUrl ? (
-              <img src={qrUrl} alt="QR" className="w-40 h-40" />
+              <img src={qrUrl} alt="QR" className="w-40 h-40 mix-blend-multiply" />
             ) : (
-              <div className="text-gray-300 text-xs font-bold text-center">반을 선택하면<br/>QR이 생성됩니다</div>
+              <div className="text-gray-300 text-xs font-bold text-center py-10">반을 선택하면<br/>QR이 생성됩니다</div>
             )}
           </div>
         </div>
