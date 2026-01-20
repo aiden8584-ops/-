@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Question, QuizSettings } from '../types';
+import { playSound } from '../services/audioService';
 
 interface QuizProps {
   questions: Question[];
@@ -67,8 +68,10 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
     const isCorrect = optionIndex === currentQuestion.correctAnswerIndex;
 
     if (isCorrect) {
+      playSound('correct');
       setScore(prev => prev + 1);
     } else {
+      playSound('incorrect');
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setWrongQuestions(prev => [...prev, currentQuestion]);
@@ -80,6 +83,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
         setSelectedOption(null);
         setIsAnswered(false);
       } else {
+        playSound('complete');
         const finalTime = Math.floor((Date.now() - startTime) / 1000);
         onComplete(isCorrect ? score + 1 : score, questions.length, finalTime, isCorrect ? wrongQuestions : [...wrongQuestions, currentQuestion]);
       }
