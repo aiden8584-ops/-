@@ -3,33 +3,14 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Button from '../components/Button';
 import { fetchSheetTabs, checkSheetAvailability } from '../services/sheetService';
 import { APP_CONFIG } from '../config';
-import { QuestionType } from '../types';
+import { QuestionType, TypeDistribution } from '../types';
 
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
-const SETTINGS_KEY = 'vocamaster_quiz_settings';
+const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
 
-const APP_VERSION = "v1.18 (Context - Single Sentence)";
-
-const GAS_CODE_SNIPPET = `/**
- * [VocaMaster 단어시험 채점 시스템 v1.18]
- */
-function doGet(e) { return ContentService.createTextOutput("VocaMaster 연결 성공!"); }
-function doPost(e) {
-  if (typeof e === 'undefined' || !e.postData) return ContentService.createTextOutput("⚠️ Error");
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("결과") || ss.insertSheet("결과");
-    if (sheet.getLastRow() == 0) {
-      sheet.appendRow(["구분(반)", "이름", "점수", "총점", "소요시간(초)", "시험날짜", "제출일시"]);
-      sheet.setFrozenRows(1);
-    }
-    sheet.appendRow([data.tabName, data.studentName, data.score, data.total, data.timeTaken, data.testDate, data.timestamp]);
-    return ContentService.createTextOutput("Success");
-  } catch(e) { return ContentService.createTextOutput("Error: " + e.toString()); }
-}`;
+const APP_VERSION = "v1.20 (Custom Distribution)";
 
 const TeacherDashboard: React.FC = () => {
   const [sheetId, setSheetId] = useState('');
@@ -37,17 +18,14 @@ const TeacherDashboard: React.FC = () => {
   const [baseUrl, setBaseUrl] = useState('');
   
   // Quiz Settings
-  const [totalQuestions, setTotalQuestions] = useState(APP_CONFIG.defaultSettings.totalQuestions);
   const [timeLimit, setTimeLimit] = useState(APP_CONFIG.defaultSettings.timeLimitPerQuestion);
-  const [questionType, setQuestionType] = useState<QuestionType>(APP_CONFIG.defaultSettings.questionType);
+  const [distribution, setDistribution] = useState<TypeDistribution>(APP_CONFIG.defaultSettings.typeDistribution);
 
   const [availableTabs, setAvailableTabs] = useState<string[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'success_manual' | 'fail'>('none');
   const [isCopied, setIsCopied] = useState(false);
-  const [showScriptGuide, setShowScriptGuide] = useState(false);
-  const [isCodeCopied, setIsCodeCopied] = useState(false);
 
   useEffect(() => {
     setSheetId(localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId);
@@ -57,9 +35,10 @@ const TeacherDashboard: React.FC = () => {
     const savedSettings = localStorage.getItem(SETTINGS_KEY);
     if (savedSettings) {
       const parsed = JSON.parse(savedSettings);
-      setTotalQuestions(parsed.totalQuestions);
       setTimeLimit(parsed.timeLimitPerQuestion);
-      setQuestionType(parsed.questionType);
+      if (parsed.typeDistribution) {
+        setDistribution(parsed.typeDistribution);
+      }
     }
 
     if (localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId) {
@@ -69,11 +48,10 @@ const TeacherDashboard: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      totalQuestions,
       timeLimitPerQuestion: timeLimit,
-      questionType
+      typeDistribution: distribution
     }));
-  }, [totalQuestions, timeLimit, questionType]);
+  }, [timeLimit, distribution]);
 
   const loadTabs = async (id: string) => {
     if (!id) return;
@@ -94,15 +72,21 @@ const TeacherDashboard: React.FC = () => {
     }
   };
 
+  const totalQuestions = distribution.engToKor + distribution.korToEng + distribution.context;
+
   const shareUrl = useMemo(() => {
     if (!sheetId) return "";
     const params = new URLSearchParams();
     params.set('sheet_id', sheetId.trim());
     if (scriptUrl) params.set('script', scriptUrl.trim());
     if (selectedClass) params.set('class_name', selectedClass);
-    params.set('num_q', totalQuestions.toString());
+    
+    // Updated params for distribution
+    params.set('c_ek', distribution.engToKor.toString());
+    params.set('c_ke', distribution.korToEng.toString());
+    params.set('c_ctx', distribution.context.toString());
+    
     params.set('t_limit', timeLimit.toString());
-    params.set('q_type', questionType);
     params.set('date', new Date().toISOString().split('T')[0]);
     
     let url = baseUrl.trim() || window.location.origin + window.location.pathname;
@@ -110,58 +94,109 @@ const TeacherDashboard: React.FC = () => {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     
     return `${url}/?${params.toString()}`;
-  }, [sheetId, scriptUrl, selectedClass, baseUrl, totalQuestions, timeLimit, questionType]);
+  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit]);
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
+
+  const applyPreset = (type: 'balanced' | 'basic' | 'context_heavy') => {
+    if (type === 'balanced') {
+      setDistribution({ engToKor: 15, korToEng: 15, context: 20 });
+    } else if (type === 'basic') {
+      setDistribution({ engToKor: 25, korToEng: 25, context: 0 });
+    } else if (type === 'context_heavy') {
+      setDistribution({ engToKor: 10, korToEng: 10, context: 30 });
+    }
+  };
 
   return (
     <div className="animate-pop space-y-8 pb-24">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-black text-gray-900 tracking-tight">선생님 관리 대시보드</h2>
         <p className="text-gray-500 text-sm">학생들에게 배포할 시험 링크를 생성하고 시스템을 설정합니다.</p>
+        <p className="text-[10px] text-gray-400 font-mono">{APP_VERSION}</p>
       </div>
 
       {/* 1. 시험 커스터마이징 */}
       <section className="bg-white rounded-[2rem] shadow-xl overflow-hidden border border-gray-100">
         <div className="bg-indigo-600 px-8 py-5 text-white flex justify-between items-center">
-          <h3 className="font-bold text-lg">시험 문제 및 설정</h3>
+          <h3 className="font-bold text-lg">시험 문제 구성</h3>
           <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded">Step 1</span>
         </div>
-        <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">문항 수</label>
-            <input 
-              type="number" 
-              value={totalQuestions} 
-              onChange={(e) => setTotalQuestions(Number(e.target.value))}
-              className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold"
-            />
+        
+        <div className="p-8">
+          {/* Preset Buttons */}
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <button onClick={() => applyPreset('basic')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-bold text-gray-600 transition-colors whitespace-nowrap">
+              ⚖️ 기본 (영한 25 / 한영 25)
+            </button>
+            <button onClick={() => applyPreset('balanced')} className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-full text-xs font-bold text-indigo-600 transition-colors whitespace-nowrap">
+              🎨 골고루 (영한 15 / 한영 15 / 빈칸 20)
+            </button>
+            <button onClick={() => applyPreset('context_heavy')} className="px-4 py-2 bg-purple-50 hover:bg-purple-100 rounded-full text-xs font-bold text-purple-600 transition-colors whitespace-nowrap">
+              🧠 빈칸 집중 (빈칸 30 / 나머지 20)
+            </button>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">문항당 시간 제한 (초)</label>
-            <div className="relative">
-              <input 
-                type="number" 
-                value={timeLimit} 
-                onChange={(e) => setTimeLimit(Number(e.target.value))}
-                className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold"
-                placeholder="0 = 무제한"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">초</span>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase">1. 영어 보고 뜻 찾기</label>
+              <div className="relative">
+                <input 
+                  type="number" min="0" max="100"
+                  value={distribution.engToKor} 
+                  onChange={(e) => setDistribution({...distribution, engToKor: Number(e.target.value)})}
+                  className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-lg"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">문제</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase">2. 뜻 보고 영어 찾기</label>
+              <div className="relative">
+                <input 
+                  type="number" min="0" max="100"
+                  value={distribution.korToEng} 
+                  onChange={(e) => setDistribution({...distribution, korToEng: Number(e.target.value)})}
+                  className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-lg"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">문제</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-indigo-600 uppercase">3. 빈칸 추론 (1문장)</label>
+              <div className="relative">
+                <input 
+                  type="number" min="0" max="100"
+                  value={distribution.context} 
+                  onChange={(e) => setDistribution({...distribution, context: Number(e.target.value)})}
+                  className="w-full px-4 py-3 bg-indigo-50 border-2 border-indigo-200 text-indigo-800 rounded-xl focus:border-indigo-500 outline-none font-bold text-lg"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-400 text-xs font-bold">문제</span>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 text-white p-4 rounded-xl flex flex-col items-center justify-center h-[84px]">
+              <span className="text-[10px] text-gray-400 font-bold uppercase">총 문항 수</span>
+              <span className="text-3xl font-black">{totalQuestions}</span>
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700">문제 유형</label>
-            <select 
-              value={questionType} 
-              onChange={(e) => setQuestionType(e.target.value as QuestionType)}
-              className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold appearance-none"
-            >
-              <option value="mixed">영어/한글 혼합 (기본)</option>
-              <option value="engToKor">영어 보고 뜻 고르기</option>
-              <option value="korToEng">한글 보고 영어 고르기</option>
-              <option value="context">빈칸 추론 (1문장/쉬움)</option>
-            </select>
+
+          <div className="mt-6 pt-6 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700">문항당 시간 제한 (초)</label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={timeLimit} 
+                    onChange={(e) => setTimeLimit(Number(e.target.value))}
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold"
+                    placeholder="0 = 무제한"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">초</span>
+                </div>
+              </div>
           </div>
         </div>
       </section>

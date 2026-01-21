@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Button from '../components/Button';
-import { AppView, QuizSettings, QuestionType } from '../types';
+import { AppView, QuizSettings, QuestionType, TypeDistribution } from '../types';
 import { fetchSheetTabs } from '../services/sheetService';
 import { APP_CONFIG } from '../config';
 
@@ -35,10 +35,15 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const urlClass = params.get('class_name');
     const urlDate = params.get('date');
     
-    // Quiz Custom Params
+    // Quiz Custom Params (New & Legacy)
     const urlNumQ = params.get('num_q');
     const urlTLimit = params.get('t_limit');
-    const urlQType = params.get('q_type');
+    const urlQType = params.get('q_type'); // Legacy support
+    
+    // New Distribution Params
+    const cntEK = params.get('c_ek');
+    const cntKE = params.get('c_ke');
+    const cntCtx = params.get('c_ctx');
 
     if (urlSheetId) {
       localStorage.setItem(SHEET_KEY, urlSheetId);
@@ -63,15 +68,42 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       setTimeout(() => nameInputRef.current?.focus(), 500);
     }
 
-    // Merge settings
+    // Resolve Settings
+    let newDistribution: TypeDistribution = { ...APP_CONFIG.defaultSettings.typeDistribution };
+    let newTimeLimit = APP_CONFIG.defaultSettings.timeLimitPerQuestion;
+
+    if (urlTLimit) newTimeLimit = Number(urlTLimit);
+
+    // If new granular params exist, use them
+    if (cntEK !== null || cntKE !== null || cntCtx !== null) {
+      newDistribution = {
+        engToKor: Number(cntEK || 0),
+        korToEng: Number(cntKE || 0),
+        context: Number(cntCtx || 0),
+      };
+    } 
+    // Fallback to legacy logic if old params are present but new ones aren't
+    else if (urlNumQ) {
+      const total = Number(urlNumQ);
+      const type = urlQType || 'mixed';
+      
+      if (type === 'engToKor') newDistribution = { engToKor: total, korToEng: 0, context: 0 };
+      else if (type === 'korToEng') newDistribution = { engToKor: 0, korToEng: total, context: 0 };
+      else if (type === 'context') newDistribution = { engToKor: 0, korToEng: 0, context: total };
+      else newDistribution = { engToKor: Math.ceil(total / 2), korToEng: Math.floor(total / 2), context: 0 };
+    }
+
+    const totalCalculated = newDistribution.engToKor + newDistribution.korToEng + newDistribution.context;
+
     setQuizSettings({
-      totalQuestions: urlNumQ ? Number(urlNumQ) : APP_CONFIG.defaultSettings.totalQuestions,
-      timeLimitPerQuestion: urlTLimit ? Number(urlTLimit) : APP_CONFIG.defaultSettings.timeLimitPerQuestion,
-      questionType: (urlQType as QuestionType) || APP_CONFIG.defaultSettings.questionType,
+      totalQuestions: totalCalculated,
+      timeLimitPerQuestion: newTimeLimit,
+      questionType: 'mixed', // Placeholder
+      typeDistribution: newDistribution
     });
     
     // Clean URL
-    if (urlSheetId || urlScript || urlClass) {
+    if (urlSheetId || urlScript || urlClass || cntEK) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -128,7 +160,16 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                   <div>
                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">배정된 수업 정보</p>
                     <p className="text-xl font-black text-indigo-900">{className}</p>
-                    <p className="text-xs font-bold text-indigo-500">문항: {quizSettings.totalQuestions}개 | 제한: {quizSettings.timeLimitPerQuestion || "무제한"}</p>
+                    <p className="text-xs font-bold text-indigo-500 mt-1">
+                      총 {quizSettings.totalQuestions}문항
+                      <span className="text-indigo-300 mx-2">|</span> 
+                      {quizSettings.timeLimitPerQuestion ? `${quizSettings.timeLimitPerQuestion}초 제한` : "시간 무제한"}
+                    </p>
+                    <div className="flex gap-2 mt-2 text-[10px] font-semibold text-indigo-400">
+                      {quizSettings.typeDistribution.engToKor > 0 && <span className="bg-white px-2 py-1 rounded">영한 {quizSettings.typeDistribution.engToKor}</span>}
+                      {quizSettings.typeDistribution.korToEng > 0 && <span className="bg-white px-2 py-1 rounded">한영 {quizSettings.typeDistribution.korToEng}</span>}
+                      {quizSettings.typeDistribution.context > 0 && <span className="bg-white px-2 py-1 rounded text-purple-600 border border-purple-100">빈칸 {quizSettings.typeDistribution.context}</span>}
+                    </div>
                   </div>
                   <button type="button" onClick={() => setIsUrlInitialized(false)} className="text-xs font-black text-indigo-600 underline">변경</button>
                 </div>

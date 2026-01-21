@@ -8,10 +8,17 @@ export interface Question {
 
 export type QuestionType = 'mixed' | 'engToKor' | 'korToEng' | 'context';
 
+export interface TypeDistribution {
+  engToKor: number;
+  korToEng: number;
+  context: number;
+}
+
 export interface QuizSettings {
-  totalQuestions: number;
+  totalQuestions: number; // Derived from distribution
   timeLimitPerQuestion: number; // 0 for no limit
-  questionType: QuestionType;
+  questionType: QuestionType; // Kept for legacy/display purposes
+  typeDistribution: TypeDistribution;
 }
 
 export interface QuizResult {

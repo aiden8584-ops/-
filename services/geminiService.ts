@@ -14,34 +14,41 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 /**
  * Generates a quiz locally using sheet words as distractors.
- * Fallback mechanism.
+ * Fallback mechanism if API fails.
  */
 const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Question[] => {
-  const total = Math.min(sheetWords.length, settings.totalQuestions);
+  const dist = settings.typeDistribution;
+  const totalNeeded = dist.engToKor + dist.korToEng + dist.context;
+  const actualTotal = Math.min(sheetWords.length, totalNeeded);
+  
   const shuffledSource = shuffleArray(sheetWords);
-  const limitedWords = shuffledSource.slice(0, total);
+  const limitedWords = shuffledSource.slice(0, actualTotal);
   
   const allMeanings = sheetWords.map(sw => sw.meaning);
   const allWords = sheetWords.map(sw => sw.word);
+
+  let currentEK = 0;
+  let currentKE = 0;
+  // Note: Local quiz cannot generate Context questions effectively without AI, so we map Context requests to EngToKor fallback.
+  const targetEK = dist.engToKor + dist.context; 
 
   return limitedWords.map((sw, idx) => {
     let showWord = '';
     let correctAnswer = '';
     let distractorsPool: string[] = [];
     
-    // Determine type for this specific question
-    let currentType = settings.questionType;
+    // Determine type for this specific question based on counts
+    let type: 'engToKor' | 'korToEng' = 'engToKor';
     
-    // Local fallback cannot do high-level context, revert to engToKor
-    if (currentType === 'context') {
-       currentType = 'engToKor';
+    if (currentEK < targetEK) {
+      type = 'engToKor';
+      currentEK++;
+    } else {
+      type = 'korToEng';
+      currentKE++;
     }
 
-    if (currentType === 'mixed') {
-      currentType = idx < (total / 2) ? 'engToKor' : 'korToEng';
-    }
-
-    if (currentType === 'engToKor') {
+    if (type === 'engToKor') {
       showWord = sw.word;
       correctAnswer = sw.meaning;
       distractorsPool = allMeanings.filter(m => m !== correctAnswer);
@@ -71,55 +78,49 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     throw new Error("시험을 생성할 단어 데이터가 없습니다.");
   }
 
+  const dist = settings.typeDistribution;
+  const totalQuestions = dist.engToKor + dist.korToEng + dist.context;
+
   const shuffled = shuffleArray(sheetWords);
-  const limitedWords = shuffled.slice(0, settings.totalQuestions); 
+  const limitedWords = shuffled.slice(0, totalQuestions); 
   
-  let prompt = '';
+  const prompt = `
+    I have a vocabulary list.
+    SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-  if (settings.questionType === 'context') {
-    prompt = `
-      I have a vocabulary list.
-      SOURCE DATA: ${JSON.stringify(limitedWords)}
+    Task: Create a test with exactly ${totalQuestions} questions based on the following distribution rules:
 
-      Task: Create a "Contextual Inference" test with exactly ${settings.totalQuestions} questions.
+    DISTRIBUTION REQUIREMENTS:
+    1. Create **${dist.engToKor}** questions of Type 'EngToKor' (English Word -> Korean Meaning).
+    2. Create **${dist.korToEng}** questions of Type 'KorToEng' (Korean Meaning -> English Word).
+    3. Create **${dist.context}** questions of Type 'Context' (Fill-in-the-blank Sentence).
 
-      STRICT RULES FOR 'CONTEXT' TYPE:
-      1. **Structure**: For each target word, write a **single, clear English sentence** where the target word fits into a blank.
-      2. **Difficulty**: Easy to Intermediate. Use simple vocabulary and grammar for the sentence so the student focuses on the target word.
-      3. **The Blank**: Represent the missing word as "_______".
-      4. **Logic**: The sentence should provide a clear clue (context) for the missing word.
-      5. **Distractors**: The 3 distractors must be:
-         - **Same Part of Speech**: If the answer is a verb, all distractors must be verbs.
-         - **Distinct**: Distractors should be clearly incorrect in this context (not too confusing), but still valid English words.
-      6. **Output**:
-         - "word": The single sentence with the blank.
-         - "options": Array of 4 words (1 correct + 3 distractors).
-         - "correctAnswerIndex": Index of the correct word.
+    RULES FOR EACH TYPE:
+    
+    [Type: EngToKor]
+    - 'word': Show the English word from source.
+    - 'options': 1 correct Korean meaning + 3 distinct incorrect Korean meanings.
+    - Distractors: Must be distinct and not synonyms.
 
-      Return the result as a JSON array of Question objects.
-    `;
-  } else {
-    prompt = `
-      I have a vocabulary list for a high-quality test. 
-      SOURCE DATA: ${JSON.stringify(limitedWords)}
+    [Type: KorToEng]
+    - 'word': Show the Korean meaning from source.
+    - 'options': 1 correct English word + 3 distinct incorrect English words.
+    - Distractors: Must be same part of speech.
 
-      Task: Create a test with exactly ${settings.totalQuestions} questions following strict pedagogical guidelines.
-      
-      QUIZ TYPE SETTING: ${settings.questionType}
-      - If 'mixed': Split questions equally between (English Word -> Korean Meaning) and (Korean Meaning -> English Word).
-      - If 'engToKor': Show English, ask for Korean meaning.
-      - If 'korToEng': Show Korean, ask for English word.
+    [Type: Context]
+    - 'word': Write a **single, clear English sentence** where the target word fits into a blank (_______).
+       - Difficulty: Easy to Intermediate. Clear context clue.
+       - Do NOT use the Korean definition in the sentence.
+    - 'options': 1 correct English word + 3 distinct incorrect English words.
+    - Distractors: Must be same part of speech and clearly incorrect in this context.
 
-      STRICT GUIDELINES FOR OPTIONS (DISTRACTORS):
-      1. **PART OF SPEECH (품사 일치)**: All 4 options (correct answer and 3 distractors) MUST belong to the same part of speech (e.g., all verbs, all nouns, all adjectives).
-      2. **NO SYNONYMS (의미 중복 금지)**: Do NOT use distractors that are synonyms or have overlapping/similar meanings to the correct answer. This is critical to prevent multiple correct answers. (e.g., if the answer is 'clear', do not use 'vivid' as a distractor).
-      3. **BALANCED DIFFICULTY (난이도 조절)**: Distractors should be plausible but clearly incorrect. Do not make the correct answer too obvious by using irrelevant words.
-      4. **NO AMBIGUITY**: Ensure the correct answer is the single most accurate translation based on the source data.
-      5. **Shuffle**: Randomly place the correct answer among the 4 options and set 'correctAnswerIndex' (0-3) accurately.
+    GENERAL RULES:
+    - Order: You can mix the order or group them, but the total counts must match.
+    - Shuffle 'options' for every question so the answer position is random.
+    - Assign a unique 'id' (0 to ${totalQuestions - 1}).
 
-      Return the result as a JSON array of Question objects.
-    `;
-  }
+    Return the result as a JSON array of Question objects.
+  `;
 
   try {
     const response = await ai.models.generateContent({
