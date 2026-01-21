@@ -104,6 +104,9 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
   };
 
   const progress = ((currentIndex + 1) / questions.length) * 100;
+  
+  // Check if the question text is long (likely a sentence/paragraph)
+  const isLongText = currentQuestion.word.length > 40;
 
   return (
     <div className="max-w-2xl mx-auto animate-pop">
@@ -133,12 +136,16 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
       </div>
 
       <div className={`bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-transform duration-200 ${shake ? 'animate-shake' : ''}`}>
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 p-10 text-center">
-          <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight leading-tight break-keep">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 p-8 md:p-10 flex flex-col justify-center min-h-[160px]">
+          <h2 
+            className={`font-bold text-white tracking-tight leading-snug break-keep ${
+              isLongText ? 'text-xl md:text-2xl text-left' : 'text-3xl md:text-5xl text-center'
+            }`}
+          >
             {currentQuestion.word}
           </h2>
-          {selectedOption === -1 && <p className="text-red-200 mt-3 text-sm font-bold animate-bounce">Time Up!</p>}
-          {!isAnswered && settings.timeLimitPerQuestion === 0 && <p className="text-indigo-100 mt-3 text-sm font-medium">Choose the correct answer</p>}
+          {selectedOption === -1 && <p className="text-red-200 mt-3 text-sm font-bold animate-bounce text-center">Time Up!</p>}
+          {!isAnswered && settings.timeLimitPerQuestion === 0 && <p className="text-indigo-100 mt-3 text-sm font-medium text-center">Choose the correct answer</p>}
         </div>
 
         <div className="p-6 grid gap-4">

@@ -31,6 +31,12 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Que
     
     // Determine type for this specific question
     let currentType = settings.questionType;
+    
+    // Local fallback cannot do high-level context, revert to engToKor
+    if (currentType === 'context') {
+       currentType = 'engToKor';
+    }
+
     if (currentType === 'mixed') {
       currentType = idx < (total / 2) ? 'engToKor' : 'korToEng';
     }
@@ -68,26 +74,51 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
   const shuffled = shuffleArray(sheetWords);
   const limitedWords = shuffled.slice(0, settings.totalQuestions); 
   
-  const prompt = `
-    I have a vocabulary list for a high-quality test. 
-    SOURCE DATA: ${JSON.stringify(limitedWords)}
+  let prompt = '';
 
-    Task: Create a test with exactly ${settings.totalQuestions} questions following strict pedagogical guidelines.
-    
-    QUIZ TYPE SETTING: ${settings.questionType}
-    - If 'mixed': Split questions equally between (English Word -> Korean Meaning) and (Korean Meaning -> English Word).
-    - If 'engToKor': Show English, ask for Korean meaning.
-    - If 'korToEng': Show Korean, ask for English word.
+  if (settings.questionType === 'context') {
+    prompt = `
+      I have a vocabulary list.
+      SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-    STRICT GUIDELINES FOR OPTIONS (DISTRACTORS):
-    1. **PART OF SPEECH (품사 일치)**: All 4 options (correct answer and 3 distractors) MUST belong to the same part of speech (e.g., all verbs, all nouns, all adjectives).
-    2. **NO SYNONYMS (의미 중복 금지)**: Do NOT use distractors that are synonyms or have overlapping/similar meanings to the correct answer. This is critical to prevent multiple correct answers. (e.g., if the answer is 'clear', do not use 'vivid' as a distractor).
-    3. **BALANCED DIFFICULTY (난이도 조절)**: Distractors should be plausible but clearly incorrect. Do not make the correct answer too obvious by using irrelevant words.
-    4. **NO AMBIGUITY**: Ensure the correct answer is the single most accurate translation based on the source data.
-    5. **Shuffle**: Randomly place the correct answer among the 4 options and set 'correctAnswerIndex' (0-3) accurately.
+      Task: Create a "High-Level Contextual Inference" test with exactly ${settings.totalQuestions} questions.
 
-    Return the result as a JSON array of Question objects.
-  `;
+      STRICT RULES FOR 'CONTEXT' TYPE:
+      1. **Structure**: For each target word, write a sophisticated, **2-3 sentence paragraph** where the target word fits into a blank.
+      2. **The Blank**: Represent the missing word as "_______".
+      3. **Logic**: The context must require logical inference. Do NOT just write a simple definition sentence. The student must understand the *situation* to choose the word.
+      4. **Distractors (Tricky)**: The 3 distractors must be:
+         - **Same Part of Speech**: If the answer is a verb, all distractors must be verbs.
+         - **Confusing**: Use words with similar spellings OR words that are synonyms in other contexts but do not fit *this specific* context.
+      5. **Output**:
+         - "word": The 2-3 sentence paragraph with the blank.
+         - "options": Array of 4 words (1 correct + 3 distractors).
+         - "correctAnswerIndex": Index of the correct word.
+
+      Return the result as a JSON array of Question objects.
+    `;
+  } else {
+    prompt = `
+      I have a vocabulary list for a high-quality test. 
+      SOURCE DATA: ${JSON.stringify(limitedWords)}
+
+      Task: Create a test with exactly ${settings.totalQuestions} questions following strict pedagogical guidelines.
+      
+      QUIZ TYPE SETTING: ${settings.questionType}
+      - If 'mixed': Split questions equally between (English Word -> Korean Meaning) and (Korean Meaning -> English Word).
+      - If 'engToKor': Show English, ask for Korean meaning.
+      - If 'korToEng': Show Korean, ask for English word.
+
+      STRICT GUIDELINES FOR OPTIONS (DISTRACTORS):
+      1. **PART OF SPEECH (품사 일치)**: All 4 options (correct answer and 3 distractors) MUST belong to the same part of speech (e.g., all verbs, all nouns, all adjectives).
+      2. **NO SYNONYMS (의미 중복 금지)**: Do NOT use distractors that are synonyms or have overlapping/similar meanings to the correct answer. This is critical to prevent multiple correct answers. (e.g., if the answer is 'clear', do not use 'vivid' as a distractor).
+      3. **BALANCED DIFFICULTY (난이도 조절)**: Distractors should be plausible but clearly incorrect. Do not make the correct answer too obvious by using irrelevant words.
+      4. **NO AMBIGUITY**: Ensure the correct answer is the single most accurate translation based on the source data.
+      5. **Shuffle**: Randomly place the correct answer among the 4 options and set 'correctAnswerIndex' (0-3) accurately.
+
+      Return the result as a JSON array of Question objects.
+    `;
+  }
 
   try {
     const response = await ai.models.generateContent({

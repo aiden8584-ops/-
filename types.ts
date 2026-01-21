@@ -6,7 +6,7 @@ export interface Question {
   correctAnswerIndex: number;
 }
 
-export type QuestionType = 'mixed' | 'engToKor' | 'korToEng';
+export type QuestionType = 'mixed' | 'engToKor' | 'korToEng' | 'context';
 
 export interface QuizSettings {
   totalQuestions: number;

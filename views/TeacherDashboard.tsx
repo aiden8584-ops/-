@@ -10,10 +10,10 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 const SETTINGS_KEY = 'vocamaster_quiz_settings';
 
-const APP_VERSION = "v1.16 (Enhanced UI)";
+const APP_VERSION = "v1.17 (High-Level Context)";
 
 const GAS_CODE_SNIPPET = `/**
- * [VocaMaster 단어시험 채점 시스템 v1.16]
+ * [VocaMaster 단어시험 채점 시스템 v1.17]
  */
 function doGet(e) { return ContentService.createTextOutput("VocaMaster 연결 성공!"); }
 function doPost(e) {
@@ -157,9 +157,10 @@ const TeacherDashboard: React.FC = () => {
               onChange={(e) => setQuestionType(e.target.value as QuestionType)}
               className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none font-bold appearance-none"
             >
-              <option value="mixed">영어/한글 혼합</option>
+              <option value="mixed">영어/한글 혼합 (기본)</option>
               <option value="engToKor">영어 보고 뜻 고르기</option>
               <option value="korToEng">한글 보고 영어 고르기</option>
+              <option value="context">빈칸 추론 (고난이도 문맥)</option>
             </select>
           </div>
         </div>

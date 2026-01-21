@@ -22,6 +22,6 @@ export const APP_CONFIG = {
   defaultSettings: {
     totalQuestions: 50,
     timeLimitPerQuestion: 0, // 0이면 무제한
-    questionType: "mixed" as const // "mixed", "engToKor", "korToEng"
+    questionType: "mixed" as const // "mixed", "engToKor", "korToEng", "context"
   }
 };
