@@ -81,17 +81,18 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
       I have a vocabulary list.
       SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-      Task: Create a "High-Level Contextual Inference" test with exactly ${settings.totalQuestions} questions.
+      Task: Create a "Contextual Inference" test with exactly ${settings.totalQuestions} questions.
 
       STRICT RULES FOR 'CONTEXT' TYPE:
-      1. **Structure**: For each target word, write a sophisticated, **2-3 sentence paragraph** where the target word fits into a blank.
-      2. **The Blank**: Represent the missing word as "_______".
-      3. **Logic**: The context must require logical inference. Do NOT just write a simple definition sentence. The student must understand the *situation* to choose the word.
-      4. **Distractors (Tricky)**: The 3 distractors must be:
+      1. **Structure**: For each target word, write a **single, clear English sentence** where the target word fits into a blank.
+      2. **Difficulty**: Easy to Intermediate. Use simple vocabulary and grammar for the sentence so the student focuses on the target word.
+      3. **The Blank**: Represent the missing word as "_______".
+      4. **Logic**: The sentence should provide a clear clue (context) for the missing word.
+      5. **Distractors**: The 3 distractors must be:
          - **Same Part of Speech**: If the answer is a verb, all distractors must be verbs.
-         - **Confusing**: Use words with similar spellings OR words that are synonyms in other contexts but do not fit *this specific* context.
-      5. **Output**:
-         - "word": The 2-3 sentence paragraph with the blank.
+         - **Distinct**: Distractors should be clearly incorrect in this context (not too confusing), but still valid English words.
+      6. **Output**:
+         - "word": The single sentence with the blank.
          - "options": Array of 4 words (1 correct + 3 distractors).
          - "correctAnswerIndex": Index of the correct word.
 
