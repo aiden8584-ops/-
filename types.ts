@@ -29,6 +29,7 @@ export interface QuizResult {
   totalQuestions: number;
   timeTakenSeconds: number;
   timestamp: string; // ISO string
+  incorrectQuestions?: Question[]; // Added for immediate review
 }
 
 export interface IncorrectWord {

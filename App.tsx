@@ -114,6 +114,7 @@ function App() {
       totalQuestions: total,
       timeTakenSeconds: timeSeconds,
       timestamp: new Date().toISOString(),
+      incorrectQuestions: wrongQuestions, // Save wrong questions for immediate review
     };
     if (!isReviewMode) saveResult(result);
     else setLastResult(result);

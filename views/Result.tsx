@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { QuizResult } from '../types';
 import Button from '../components/Button';
@@ -10,6 +11,8 @@ interface ResultProps {
 
 const Result: React.FC<ResultProps> = ({ result, onHome, submissionStatus = 'idle' }) => {
   const [copied, setCopied] = useState(false);
+  const [showWrongAnswers, setShowWrongAnswers] = useState(false);
+  
   const percentage = Math.round((result.score / result.totalQuestions) * 100);
   
   let gradeColor = 'text-red-500';
@@ -38,6 +41,8 @@ const Result: React.FC<ResultProps> = ({ result, onHome, submissionStatus = 'idl
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const incorrectList = result.incorrectQuestions || [];
 
   return (
     <div className="flex flex-col items-center justify-center animate-pop py-8">
@@ -86,6 +91,32 @@ const Result: React.FC<ResultProps> = ({ result, onHome, submissionStatus = 'idl
                  </span>
                )}
              </div>
+          )}
+
+          {incorrectList.length > 0 && (
+            <div className="mb-8 border-t border-gray-100 pt-6">
+              <button 
+                onClick={() => setShowWrongAnswers(!showWrongAnswers)}
+                className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors"
+              >
+                <span>{showWrongAnswers ? '🔼 오답 접기' : '🔽 틀린 문제 확인하기'}</span>
+                <span className="bg-red-200 text-red-700 text-xs px-2 py-1 rounded-full">{incorrectList.length}개</span>
+              </button>
+
+              {showWrongAnswers && (
+                <div className="mt-4 text-left space-y-3 animate-pop">
+                  {incorrectList.map((q, idx) => (
+                    <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                      <div className="text-sm font-bold text-gray-800 mb-1 break-keep">{q.word}</div>
+                      <div className="text-xs font-semibold text-green-600 flex items-center gap-1">
+                        <span className="bg-green-100 px-1.5 py-0.5 rounded">정답</span>
+                        {q.options[q.correctAnswerIndex]}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="space-y-3">
