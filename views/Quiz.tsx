@@ -71,7 +71,11 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
       playSound('correct');
       setScore(prev => prev + 1);
     } else {
+      // Incorrect answer: Sound + Vibrate + Shake
       playSound('incorrect');
+      if (navigator.vibrate) {
+        navigator.vibrate(200); // Vibrate for 200ms
+      }
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setWrongQuestions(prev => [...prev, currentQuestion]);

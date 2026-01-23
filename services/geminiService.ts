@@ -12,9 +12,15 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
+// Helper to pick distractors from the sheet pool
+const getDistractors = (pool: string[], correct: string, count: number = 3): string[] => {
+  const others = pool.filter(w => w !== correct);
+  return shuffleArray(others).slice(0, count);
+};
+
 /**
  * Generates a quiz locally using sheet words as distractors.
- * Fallback mechanism if API fails.
+ * Includes logic to prevent consecutive answer positions.
  */
 const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Question[] => {
   const dist = settings.typeDistribution;
@@ -28,44 +34,57 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Que
   const allWords = sheetWords.map(sw => sw.word);
 
   let currentEK = 0;
-  let currentKE = 0;
-  // Note: Local quiz cannot generate Context questions effectively without AI, so we map Context requests to EngToKor fallback.
+  // Local quiz maps Context -> EngToKor fallback
   const targetEK = dist.engToKor + dist.context; 
+  
+  let lastAnswerIndex = -1;
 
   return limitedWords.map((sw, idx) => {
     let showWord = '';
     let correctAnswer = '';
     let distractorsPool: string[] = [];
     
-    // Determine type for this specific question based on counts
+    // Determine type
     let type: 'engToKor' | 'korToEng' = 'engToKor';
-    
     if (currentEK < targetEK) {
       type = 'engToKor';
       currentEK++;
     } else {
       type = 'korToEng';
-      currentKE++;
     }
 
     if (type === 'engToKor') {
       showWord = sw.word;
       correctAnswer = sw.meaning;
-      distractorsPool = allMeanings.filter(m => m !== correctAnswer);
+      distractorsPool = allMeanings;
     } else {
       showWord = sw.meaning;
       correctAnswer = sw.word;
-      distractorsPool = allWords.filter(w => w !== correctAnswer);
+      distractorsPool = allWords;
     }
 
-    const distractors = shuffleArray(distractorsPool).slice(0, 3);
-    const options = shuffleArray([correctAnswer, ...distractors]);
+    // 1. Get in-scope distractors
+    const distractors = getDistractors(distractorsPool, correctAnswer, 3);
+    let options = [correctAnswer, ...distractors];
     
+    // 2. Shuffle ensuring no consecutive answer positions
+    let shuffledOptions: string[] = [];
+    let newAnswerIndex = -1;
+    let attempts = 0;
+
+    do {
+      shuffledOptions = shuffleArray(options);
+      newAnswerIndex = shuffledOptions.indexOf(correctAnswer);
+      attempts++;
+    } while (newAnswerIndex === lastAnswerIndex && attempts < 10);
+    
+    lastAnswerIndex = newAnswerIndex;
+
     return {
       id: idx,
       word: showWord,
-      options,
-      correctAnswerIndex: options.indexOf(correctAnswer)
+      options: shuffledOptions,
+      correctAnswerIndex: newAnswerIndex
     };
   });
 };
@@ -78,6 +97,10 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     throw new Error("시험을 생성할 단어 데이터가 없습니다.");
   }
 
+  // Pre-prepare pools for distractors (In-Scope Enforcement)
+  const allWords = sheetWords.map(s => s.word);
+  const allMeanings = sheetWords.map(s => s.meaning);
+
   const dist = settings.typeDistribution;
   const totalQuestions = dist.engToKor + dist.korToEng + dist.context;
 
@@ -85,41 +108,26 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
   const limitedWords = shuffled.slice(0, totalQuestions); 
   
   const prompt = `
-    I have a vocabulary list.
     SOURCE DATA: ${JSON.stringify(limitedWords)}
 
-    Task: Create a test with exactly ${totalQuestions} questions based on the following distribution rules:
-
-    DISTRIBUTION REQUIREMENTS:
-    1. Create **${dist.engToKor}** questions of Type 'EngToKor' (English Word -> Korean Meaning).
-    2. Create **${dist.korToEng}** questions of Type 'KorToEng' (Korean Meaning -> English Word).
-    3. Create **${dist.context}** questions of Type 'Context' (Fill-in-the-blank Sentence).
-
-    RULES FOR EACH TYPE:
+    Task: Generate content for ${totalQuestions} questions.
     
-    [Type: EngToKor]
-    - 'word': Show the English word from source.
-    - 'options': 1 correct Korean meaning + 3 distinct incorrect Korean meanings.
-    - Distractors: Must be distinct and not synonyms.
+    REQUIREMENTS:
+    1. **${dist.engToKor}** items: Type 'EngToKor' (English -> Korean).
+    2. **${dist.korToEng}** items: Type 'KorToEng' (Korean -> English).
+    3. **${dist.context}** items: Type 'Context'. Write a simple English sentence with a blank (_______) where the target word fits.
+       - Use simple vocabulary.
+       - Do NOT include the target word in the sentence.
+    
+    OUTPUT JSON FORMAT (Array of objects):
+    {
+      "id": number (original index in SOURCE DATA),
+      "type": "engToKor" | "korToEng" | "context",
+      "questionText": string (The English word, Korean meaning, or Sentence depending on type),
+      "correctAnswerString": string (The correct answer text)
+    }
 
-    [Type: KorToEng]
-    - 'word': Show the Korean meaning from source.
-    - 'options': 1 correct English word + 3 distinct incorrect English words.
-    - Distractors: Must be same part of speech.
-
-    [Type: Context]
-    - 'word': Write a **single, clear English sentence** where the target word fits into a blank (_______).
-       - Difficulty: Easy to Intermediate. Clear context clue.
-       - Do NOT use the Korean definition in the sentence.
-    - 'options': 1 correct English word + 3 distinct incorrect English words.
-    - Distractors: Must be same part of speech and clearly incorrect in this context.
-
-    GENERAL RULES:
-    - Order: You can mix the order or group them, but the total counts must match.
-    - Shuffle 'options' for every question so the answer position is random.
-    - Assign a unique 'id' (0 to ${totalQuestions - 1}).
-
-    Return the result as a JSON array of Question objects.
+    *IMPORTANT*: Do NOT generate options/distractors. I will generate them programmatically to ensure they are from the source list. Just provide the question content and the correct answer string.
   `;
 
   try {
@@ -134,14 +142,11 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
             type: Type.OBJECT,
             properties: {
               id: { type: Type.INTEGER },
-              word: { type: Type.STRING },
-              options: { 
-                type: Type.ARRAY, 
-                items: { type: Type.STRING },
-              },
-              correctAnswerIndex: { type: Type.INTEGER }
+              type: { type: Type.STRING },
+              questionText: { type: Type.STRING },
+              correctAnswerString: { type: Type.STRING }
             },
-            required: ["id", "word", "options", "correctAnswerIndex"],
+            required: ["id", "type", "questionText", "correctAnswerString"],
           },
         },
       },
@@ -150,7 +155,51 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
     
-    return JSON.parse(text) as Question[];
+    const rawQuestions = JSON.parse(text) as { id: number, type: string, questionText: string, correctAnswerString: string }[];
+    
+    // Post-processing: Generate Options from SheetWords & Anti-consecutive Shuffle
+    let lastAnswerIndex = -1;
+
+    return rawQuestions.map((q, idx) => {
+      // Find the source word object to ensure we have the correct data pairs
+      // We rely on the AI returning the correct ID or string, but for safety, we re-verify against the limited list if possible.
+      // However, AI might have shuffled. Let's use the provided 'correctAnswerString' as the anchor.
+      
+      const correct = q.correctAnswerString;
+      let pool: string[] = [];
+
+      // Determine distractor pool based on type
+      if (q.type === 'engToKor') {
+        pool = allMeanings;
+      } else {
+        // For Context and KorToEng, the answer is English, so distractors must be English words
+        pool = allWords;
+      }
+
+      // 1. Force In-Scope Distractors
+      const distractors = getDistractors(pool, correct, 3);
+      const options = [correct, ...distractors];
+
+      // 2. Shuffle options (Avoid consecutive same index)
+      let shuffledOptions: string[] = [];
+      let newIndex = -1;
+      let attempts = 0;
+
+      do {
+        shuffledOptions = shuffleArray(options);
+        newIndex = shuffledOptions.indexOf(correct);
+        attempts++;
+      } while (newIndex === lastAnswerIndex && attempts < 10);
+
+      lastAnswerIndex = newIndex;
+
+      return {
+        id: idx,
+        word: q.questionText,
+        options: shuffledOptions,
+        correctAnswerIndex: newIndex
+      };
+    });
 
   } catch (error: any) {
     console.warn("Gemini API Error. Falling back to local generation:", error.message);
