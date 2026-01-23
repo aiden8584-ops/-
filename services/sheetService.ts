@@ -96,8 +96,20 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
         if (word.toLowerCase() === 'word' || word.toLowerCase() === 'english' || word.toLowerCase() === '단어') continue;
 
         if (word && fullMeaning) {
-          const primaryMeaning = fullMeaning.split(',')[0].trim();
-          words.push({ word, meaning: primaryMeaning });
+          // Remove content within parentheses (e.g., "(adj) happy" -> "happy")
+          // Support both standard () and full-width （） parentheses
+          let cleanedMeaning = fullMeaning
+            .replace(/\([^)]*\)/g, '')
+            .replace(/（[^）]*）/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+            
+          // Remove leading/trailing commas that might remain after removal
+          cleanedMeaning = cleanedMeaning.replace(/^,|,$/g, '').trim();
+
+          if (cleanedMeaning) {
+             words.push({ word, meaning: cleanedMeaning });
+          }
         }
       }
     }
