@@ -13,9 +13,19 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 // Helper to pick distractors from the sheet pool
+// Improved: Tries to match POS for Korean meanings (ending in '다')
 const getDistractors = (pool: string[], correct: string, count: number = 3): string[] => {
-  const others = pool.filter(w => w !== correct);
-  return shuffleArray(others).slice(0, count);
+  // 1. Filter out the correct answer
+  let candidates = pool.filter(w => w !== correct);
+  
+  // 2. Simple POS Heuristic for Korean (Ends with '다' -> likely Verb/Adj)
+  const isVerbOrAdj = correct.endsWith('다');
+  const matchingCandidates = candidates.filter(w => w.endsWith('다') === isVerbOrAdj);
+
+  // 3. If we have enough matching candidates, use them. Otherwise mix.
+  let selectedPool = matchingCandidates.length >= count ? matchingCandidates : candidates;
+
+  return shuffleArray(selectedPool).slice(0, count);
 };
 
 /**
@@ -63,7 +73,7 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Que
       distractorsPool = allWords;
     }
 
-    // 1. Get in-scope distractors
+    // 1. Get in-scope distractors (POS aware for Korean)
     const distractors = getDistractors(distractorsPool, correctAnswer, 3);
     let options = [correctAnswer, ...distractors];
     
@@ -97,10 +107,6 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     throw new Error("시험을 생성할 단어 데이터가 없습니다.");
   }
 
-  // Pre-prepare pools for distractors (In-Scope Enforcement)
-  const allWords = sheetWords.map(s => s.word);
-  const allMeanings = sheetWords.map(s => s.meaning);
-
   const dist = settings.typeDistribution;
   const totalQuestions = dist.engToKor + dist.korToEng + dist.context;
 
@@ -109,25 +115,39 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
   
   const prompt = `
     SOURCE DATA: ${JSON.stringify(limitedWords)}
+    FULL POOL (For distractors): ${JSON.stringify(sheetWords.map(s => s.word))} (English), ${JSON.stringify(sheetWords.map(s => s.meaning))} (Korean)
 
-    Task: Generate content for ${totalQuestions} questions.
-    
+    Task: Generate ${totalQuestions} vocabulary questions based on SOURCE DATA.
+
     REQUIREMENTS:
-    1. **${dist.engToKor}** items: Type 'EngToKor' (English -> Korean).
-    2. **${dist.korToEng}** items: Type 'KorToEng' (Korean -> English).
-    3. **${dist.context}** items: Type 'Context'. Write a simple English sentence with a blank (_______) where the target word fits.
-       - Use simple vocabulary.
+    1. **Types**:
+       - ${dist.engToKor} items: 'EngToKor' (Show English -> Select Korean Meaning)
+       - ${dist.korToEng} items: 'KorToEng' (Show Korean Meaning -> Select English Word)
+       - ${dist.context} items: 'Context' (Fill in the blank sentence -> Select English Word)
+    
+    2. **Context Sentence Rule**:
+       - Write a simple English sentence with a blank (_______) where the target word fits naturally.
        - Do NOT include the target word in the sentence.
     
+    3. **Distractors (CRITICAL)**:
+       - For each question, provide 3 distractors (incorrect answers).
+       - **SOURCE ONLY**: Distractors MUST be chosen from the provided 'FULL POOL'. Do NOT invent words.
+       - **POS MATCHING (VERY IMPORTANT)**: 
+         - The distractors MUST have the **SAME Part of Speech (POS)** as the correct answer.
+         - If the answer is a Verb, all distractors must be Verbs.
+         - If the answer is a Noun, all distractors must be Nouns.
+         - If the answer is a Korean meaning ending in '다' (verb-like), distractors should also end in '다'.
+         - *Goal*: Prevent students from guessing the answer by grammatical elimination.
+       - If strict POS matching is impossible due to limited data, use other words from the pool but try to keep them similar in length/style.
+
     OUTPUT JSON FORMAT (Array of objects):
     {
       "id": number (original index in SOURCE DATA),
       "type": "engToKor" | "korToEng" | "context",
-      "questionText": string (The English word, Korean meaning, or Sentence depending on type),
-      "correctAnswerString": string (The correct answer text)
+      "questionText": string (The problem text to display),
+      "correctAnswerString": string (The correct option),
+      "distractors": string[] (Array of 3 strings found in FULL POOL)
     }
-
-    *IMPORTANT*: Do NOT generate options/distractors. I will generate them programmatically to ensure they are from the source list. Just provide the question content and the correct answer string.
   `;
 
   try {
@@ -144,9 +164,10 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
               id: { type: Type.INTEGER },
               type: { type: Type.STRING },
               questionText: { type: Type.STRING },
-              correctAnswerString: { type: Type.STRING }
+              correctAnswerString: { type: Type.STRING },
+              distractors: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
-            required: ["id", "type", "questionText", "correctAnswerString"],
+            required: ["id", "type", "questionText", "correctAnswerString", "distractors"],
           },
         },
       },
@@ -155,32 +176,19 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
     
-    const rawQuestions = JSON.parse(text) as { id: number, type: string, questionText: string, correctAnswerString: string }[];
+    const rawQuestions = JSON.parse(text) as { id: number, type: string, questionText: string, correctAnswerString: string, distractors: string[] }[];
     
-    // Post-processing: Generate Options from SheetWords & Anti-consecutive Shuffle
+    // Post-processing: Shuffle Options & Anti-consecutive Logic
     let lastAnswerIndex = -1;
 
     return rawQuestions.map((q, idx) => {
-      // Find the source word object to ensure we have the correct data pairs
-      // We rely on the AI returning the correct ID or string, but for safety, we re-verify against the limited list if possible.
-      // However, AI might have shuffled. Let's use the provided 'correctAnswerString' as the anchor.
-      
       const correct = q.correctAnswerString;
-      let pool: string[] = [];
-
-      // Determine distractor pool based on type
-      if (q.type === 'engToKor') {
-        pool = allMeanings;
-      } else {
-        // For Context and KorToEng, the answer is English, so distractors must be English words
-        pool = allWords;
-      }
-
-      // 1. Force In-Scope Distractors
-      const distractors = getDistractors(pool, correct, 3);
+      // Use AI provided distractors which are POS-matched
+      const distractors = q.distractors;
+      
       const options = [correct, ...distractors];
 
-      // 2. Shuffle options (Avoid consecutive same index)
+      // Shuffle options (Avoid consecutive same index)
       let shuffledOptions: string[] = [];
       let newIndex = -1;
       let attempts = 0;
