@@ -28,6 +28,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   useEffect(() => {
     const SHEET_KEY = 'vocamaster_sheet_id';
     const SCRIPT_KEY = 'vocamaster_script_url';
+    const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
     
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet_id');
@@ -45,6 +46,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const cntKE = params.get('c_ke');
     const cntCtx = params.get('c_ctx');
 
+    // 1. Sheet ID Logic
     if (urlSheetId) {
       localStorage.setItem(SHEET_KEY, urlSheetId);
       setHasSheetId(true);
@@ -57,10 +59,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       }
     }
 
+    // 2. Script URL Logic
     if (urlScript) {
       localStorage.setItem(SCRIPT_KEY, urlScript.trim());
     }
 
+    // 3. Class & Date Logic
     if (urlDate) setTestDate(urlDate);
     if (urlClass) {
       setClassName(urlClass);
@@ -68,13 +72,30 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       setTimeout(() => nameInputRef.current?.focus(), 500);
     }
 
-    // Resolve Settings
+    // 4. Quiz Settings Logic
     let newDistribution: TypeDistribution = { ...APP_CONFIG.defaultSettings.typeDistribution };
     let newTimeLimit = APP_CONFIG.defaultSettings.timeLimitPerQuestion;
 
+    // A. Load from LocalStorage (Persistent Defaults)
+    const savedSettingsJSON = localStorage.getItem(SETTINGS_KEY);
+    if (savedSettingsJSON) {
+      try {
+        const saved = JSON.parse(savedSettingsJSON);
+        if (saved.timeLimitPerQuestion !== undefined) {
+          newTimeLimit = saved.timeLimitPerQuestion;
+        }
+        if (saved.typeDistribution) {
+          newDistribution = { ...saved.typeDistribution };
+        }
+      } catch (e) {
+        console.warn("Failed to parse saved settings", e);
+      }
+    }
+
+    // B. URL Params (Override LocalStorage)
     if (urlTLimit) newTimeLimit = Number(urlTLimit);
 
-    // If new granular params exist, use them
+    // Granular params override everything
     if (cntEK !== null || cntKE !== null || cntCtx !== null) {
       newDistribution = {
         engToKor: Number(cntEK || 0),
@@ -82,7 +103,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         context: Number(cntCtx || 0),
       };
     } 
-    // Fallback to legacy logic if old params are present but new ones aren't
+    // Legacy params fallback
     else if (urlNumQ) {
       const total = Number(urlNumQ);
       const type = urlQType || 'mixed';
@@ -98,7 +119,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     setQuizSettings({
       totalQuestions: totalCalculated,
       timeLimitPerQuestion: newTimeLimit,
-      questionType: 'mixed', // Placeholder
+      questionType: 'mixed', 
       typeDistribution: newDistribution
     });
     

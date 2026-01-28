@@ -108,7 +108,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
              
              {/* Word Content */}
              <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-4xl md:text-5xl font-black text-gray-800 break-words text-center leading-tight tracking-tight drop-shadow-sm">
+                <h3 className="text-5xl md:text-7xl font-black text-gray-800 break-words text-center leading-tight tracking-tight drop-shadow-sm">
                   {currentWord?.word || ''}
                 </h3>
              </div>
@@ -132,7 +132,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
              </div>
 
              <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-3xl md:text-4xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
+                <h3 className="text-4xl md:text-6xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
                   {currentWord?.meaning || ''}
                 </h3>
              </div>
