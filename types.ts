@@ -51,6 +51,8 @@ export enum AppView {
   TEACHER_LOGIN = 'TEACHER_LOGIN',
   TEACHER_DASHBOARD = 'TEACHER_DASHBOARD',
   INCORRECT_NOTE = 'INCORRECT_NOTE',
+  PRACTICE_SELECT = 'PRACTICE_SELECT', // New: Select a set of 30 words
+  FLASHCARD = 'FLASHCARD', // New: Study view
 }
 
 export interface UserSession {

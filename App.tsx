@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppView, UserSession, QuizResult, Question, IncorrectWord, QuizSettings } from './types';
+import { AppView, UserSession, QuizResult, Question, IncorrectWord, QuizSettings, SheetWord } from './types';
 import Landing from './views/Landing';
 import Quiz from './views/Quiz';
 import Result from './views/Result';
 import TeacherDashboard from './views/TeacherDashboard';
 import IncorrectNote from './views/IncorrectNote';
+import PracticeSelect from './views/PracticeSelect';
+import FlashcardStudy from './views/FlashcardStudy';
 import { generateQuizQuestions } from './services/geminiService';
 import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
 import { APP_CONFIG } from './config';
@@ -18,7 +20,13 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 function App() {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
   const [session, setSession] = useState<UserSession | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  
+  // Data State
+  const [questions, setQuestions] = useState<Question[]>([]); // For Quiz Mode
+  const [rawPracticeWords, setRawPracticeWords] = useState<SheetWord[]>([]); // For Practice Mode (Full List)
+  const [activePracticeSet, setActivePracticeSet] = useState<SheetWord[]>([]); // For Flashcard Mode (Selected Set)
+  const [activeSetTitle, setActiveSetTitle] = useState('');
+
   const [lastResult, setLastResult] = useState<QuizResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -56,7 +64,6 @@ function App() {
         submitResultToSheet(scriptUrl, result).then(success => setSubmissionStatus(success ? 'success' : 'error'));
       }
     } else {
-      // Practice mode doesn't submit
       setSubmissionStatus('idle');
     }
   };
@@ -102,26 +109,36 @@ function App() {
       
       const sheetWords = await fetchWordsFromSheet(sheetId, className);
       
-      setLoadingMessage(mode === 'PRACTICE' ? '전체 단어 연습을 생성 중입니다...' : '시험지를 생성 중입니다...');
-      
-      // Pass mode info to generator
-      const generatedQuestions = await generateQuizQuestions(settings, sheetWords, mode === 'PRACTICE');
-      
-      setQuestions(generatedQuestions);
-      setCurrentView(AppView.QUIZ);
+      if (mode === 'PRACTICE') {
+        // PRACTICE MODE: Store raw words and go to selection screen
+        setRawPracticeWords(sheetWords);
+        setIsLoading(false);
+        setCurrentView(AppView.PRACTICE_SELECT);
+      } else {
+        // TEST MODE: Generate Questions
+        setLoadingMessage('시험지를 생성 중입니다...');
+        const generatedQuestions = await generateQuizQuestions(settings, sheetWords, false);
+        setQuestions(generatedQuestions);
+        setIsLoading(false);
+        setCurrentView(AppView.QUIZ);
+      }
     } catch (error: any) {
       alert(error.message);
       setSession(null);
-    } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePracticeSetSelect = (words: SheetWord[], setIndex: number) => {
+    setActivePracticeSet(words);
+    setActiveSetTitle(`SET ${setIndex} 연습`);
+    setCurrentView(AppView.FLASHCARD);
   };
 
   const handleQuizComplete = (score: number, total: number, timeSeconds: number, wrongQuestions: Question[]) => {
     if (!session && !isReviewMode) return;
     const nameToUse = session?.name || "익명 학생";
     
-    // Always update incorrect words locally for practice functionality
     updateIncorrectWords(nameToUse, questions, wrongQuestions);
     
     const result: QuizResult = {
@@ -142,7 +159,40 @@ function App() {
     setCurrentView(AppView.RESULT);
   };
 
-  const handleLogout = () => { setSession(null); setQuestions([]); setLastResult(null); setIsReviewMode(false); setCurrentView(AppView.LANDING); };
+  const handleLogout = () => { 
+    setSession(null); 
+    setQuestions([]); 
+    setLastResult(null); 
+    setIsReviewMode(false); 
+    setCurrentView(AppView.LANDING); 
+  };
+
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case AppView.LANDING:
+        return <Landing onStart={handleStartQuiz} onChangeView={setCurrentView} />;
+      case AppView.QUIZ:
+        return session && <Quiz questions={questions} settings={session.settings} onComplete={handleQuizComplete} />;
+      case AppView.RESULT:
+        return lastResult && <Result result={lastResult} onHome={handleLogout} submissionStatus={submissionStatus} />;
+      case AppView.TEACHER_LOGIN:
+        return (
+          <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-pop text-center">
+            <h2 className="text-2xl font-bold mb-6">선생님 로그인</h2>
+            <input type="password" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (accessCode === 'teacher' ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error'))} className="w-full px-4 py-2 border rounded-lg mb-4" placeholder="Password" />
+            <button onClick={() => accessCode === 'teacher' ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error')} className="w-full bg-indigo-600 text-white py-2 rounded-lg">Enter</button>
+          </div>
+        );
+      case AppView.TEACHER_DASHBOARD:
+        return <TeacherDashboard />;
+      case AppView.PRACTICE_SELECT:
+        return <PracticeSelect totalWords={rawPracticeWords} onSelectSet={handlePracticeSetSelect} onBack={handleLogout} />;
+      case AppView.FLASHCARD:
+        return <FlashcardStudy words={activePracticeSet} setTitle={activeSetTitle} onFinish={() => setCurrentView(AppView.PRACTICE_SELECT)} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -160,7 +210,7 @@ function App() {
           {currentView === AppView.LANDING && (
             <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium">선생님</button>
           )}
-          {(currentView === AppView.TEACHER_DASHBOARD || currentView === AppView.TEACHER_LOGIN || currentView === AppView.QUIZ || currentView === AppView.RESULT) && (
+          {(currentView !== AppView.LANDING) && (
             <button onClick={handleLogout} className="text-sm text-gray-500 font-medium">닫기</button>
           )}
         </div>
@@ -172,19 +222,7 @@ function App() {
              <p className="text-lg text-gray-600 font-semibold">{loadingMessage}</p>
           </div>
         ) : (
-          <>
-            {currentView === AppView.LANDING && <Landing onStart={handleStartQuiz} onChangeView={setCurrentView} />}
-            {currentView === AppView.QUIZ && session && <Quiz questions={questions} settings={session.settings} onComplete={handleQuizComplete} />}
-            {currentView === AppView.RESULT && lastResult && <Result result={lastResult} onHome={handleLogout} submissionStatus={submissionStatus} />}
-            {currentView === AppView.TEACHER_LOGIN && (
-              <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-pop text-center">
-                <h2 className="text-2xl font-bold mb-6">선생님 로그인</h2>
-                <input type="password" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (accessCode === 'teacher' ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error'))} className="w-full px-4 py-2 border rounded-lg mb-4" placeholder="Password" />
-                <button onClick={() => accessCode === 'teacher' ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error')} className="w-full bg-indigo-600 text-white py-2 rounded-lg">Enter</button>
-              </div>
-            )}
-            {currentView === AppView.TEACHER_DASHBOARD && <TeacherDashboard />}
-          </>
+          renderCurrentView()
         )}
       </main>
     </div>
