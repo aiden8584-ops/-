@@ -89,8 +89,8 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
         <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
       </div>
 
-      {/* Flashcard Area - INCREASED SIZE */}
-      <div className="flex-1 relative perspective-1000 mx-4 mb-8 group cursor-pointer select-none h-[60vh] min-h-[500px]" onClick={handleCardClick}>
+      {/* Flashcard Area - INCREASED HEIGHT significantly */}
+      <div className="flex-1 relative perspective-1000 mx-4 mb-8 group cursor-pointer select-none h-[75vh] min-h-[600px]" onClick={handleCardClick}>
         <div className={`relative w-full h-full transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) transform-style-3d will-change-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
           
           {/* FRONT (English) */}
@@ -106,9 +106,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 <span className="px-4 py-1.5 bg-gray-50 text-gray-400 text-xs font-black tracking-widest rounded-full uppercase border border-gray-100">English</span>
              </div>
              
-             {/* Word Content */}
+             {/* Word Content - Reduced font size slightly */}
              <div className="flex-1 flex items-center justify-center p-4" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-6xl md:text-8xl font-black text-gray-900 break-words text-center leading-tight tracking-tight drop-shadow-sm">
+                <h3 className="text-5xl md:text-7xl font-black text-gray-900 break-words text-center leading-tight tracking-tight drop-shadow-sm">
                   {currentWord?.word || ''}
                 </h3>
              </div>
@@ -131,8 +131,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 <span className="px-4 py-1.5 bg-white/10 text-indigo-100 text-xs font-black tracking-widest rounded-full uppercase backdrop-blur-sm">Meaning</span>
              </div>
 
+             {/* Meaning Content - Reduced font size slightly */}
              <div className="flex-1 flex items-center justify-center p-4" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-5xl md:text-7xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
+                <h3 className="text-4xl md:text-6xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
                   {currentWord?.meaning || ''}
                 </h3>
              </div>
