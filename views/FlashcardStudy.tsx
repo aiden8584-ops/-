@@ -68,7 +68,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
       <div className="absolute top-40 -right-10 w-64 h-64 bg-purple-200 rounded-full blur-3xl opacity-20 -z-10 mix-blend-multiply animate-pulse delay-700"></div>
 
       {/* Header Info */}
-      <div className="flex justify-between items-center px-4 pt-4 pb-4">
+      <div className="flex justify-between items-center mb-4">
         <div className="flex flex-col">
           <h2 className="text-xl font-black text-gray-800 tracking-tight">{setTitle}</h2>
           <div className="flex items-center gap-1.5 mt-1">
@@ -85,12 +85,12 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
       </div>
 
       {/* Progress Bar */}
-      <div className="mx-4 mt-2 mb-8 h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div className="w-full mb-6 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
       </div>
 
-      {/* Flashcard Area - INCREASED HEIGHT significantly */}
-      <div className="flex-1 relative perspective-1000 mx-4 mb-8 group cursor-pointer select-none h-[75vh] min-h-[600px]" onClick={handleCardClick}>
+      {/* Flashcard Area - MAXIMIZED VERTICAL HEIGHT */}
+      <div className="w-full relative perspective-1000 mb-8 group cursor-pointer select-none h-[65vh] min-h-[500px]" onClick={handleCardClick}>
         <div className={`relative w-full h-full transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) transform-style-3d will-change-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
           
           {/* FRONT (English) */}
@@ -106,7 +106,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 <span className="px-4 py-1.5 bg-gray-50 text-gray-400 text-xs font-black tracking-widest rounded-full uppercase border border-gray-100">English</span>
              </div>
              
-             {/* Word Content - Reduced font size slightly */}
+             {/* Word Content - Optimized Font Size */}
              <div className="flex-1 flex items-center justify-center p-4" style={{ transform: "translate3d(0,0,0)" }}>
                 <h3 className="text-5xl md:text-7xl font-black text-gray-900 break-words text-center leading-tight tracking-tight drop-shadow-sm">
                   {currentWord?.word || ''}
@@ -131,9 +131,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 <span className="px-4 py-1.5 bg-white/10 text-indigo-100 text-xs font-black tracking-widest rounded-full uppercase backdrop-blur-sm">Meaning</span>
              </div>
 
-             {/* Meaning Content - Reduced font size slightly */}
+             {/* Meaning Content - Optimized Font Size */}
              <div className="flex-1 flex items-center justify-center p-4" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-4xl md:text-6xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
+                <h3 className="text-3xl md:text-5xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
                   {currentWord?.meaning || ''}
                 </h3>
              </div>
@@ -151,7 +151,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
       </div>
 
       {/* Controls - Grid Layout with Hierarchy */}
-      <div className="grid grid-cols-[1fr_2fr] gap-4 mx-4 mb-4">
+      <div className="grid grid-cols-[1fr_2fr] gap-4 mb-4">
         {/* Previous: Outline Style */}
         <button 
           onClick={(e) => { e.stopPropagation(); handlePrev(); }} 
