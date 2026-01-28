@@ -88,14 +88,17 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
         <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
           
           {/* FRONT (English) */}
-          <div className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 flex flex-col p-6 z-10">
+          <div 
+            className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 flex flex-col p-6"
+            style={{ zIndex: isFlipped ? 0 : 10 }}
+          >
              <div className="shrink-0 h-12 flex items-center justify-center">
                 <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">English</span>
              </div>
              
-             <div className="flex-1 flex items-center justify-center w-full px-4 overflow-y-auto">
-                <h3 className="text-3xl md:text-4xl font-black text-gray-900 break-words text-center leading-tight">
-                  {currentWord.word}
+             <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden">
+                <h3 className="text-3xl md:text-5xl font-black text-gray-900 break-words text-center leading-tight">
+                  {currentWord?.word || ''}
                 </h3>
              </div>
 
@@ -105,14 +108,17 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
           </div>
 
           {/* BACK (Meaning) */}
-          <div className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl flex flex-col p-6 text-white z-10">
+          <div 
+            className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl flex flex-col p-6 text-white"
+            style={{ zIndex: isFlipped ? 10 : 0 }}
+          >
              <div className="shrink-0 h-12 flex items-center justify-center">
                 <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Meaning</span>
              </div>
 
-             <div className="flex-1 flex items-center justify-center w-full px-4 overflow-y-auto">
-                <h3 className="text-2xl md:text-3xl font-bold break-keep text-center leading-snug text-white">
-                  {currentWord.meaning}
+             <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden">
+                <h3 className="text-2xl md:text-4xl font-bold break-keep text-center leading-snug text-white">
+                  {currentWord?.meaning || ''}
                 </h3>
              </div>
 
