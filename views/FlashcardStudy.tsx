@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SheetWord } from '../types';
 
 interface FlashcardStudyProps {
@@ -13,10 +13,54 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const [isFlipped, setIsFlipped] = useState(false);
   const [shuffledWords, setShuffledWords] = useState<SheetWord[]>([]);
   const [isShuffled, setIsShuffled] = useState(false);
+  
+  // Timer State
+  const [timeLeft, setTimeLeft] = useState(5);
+  const autoNextTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     setShuffledWords([...words]);
   }, [words]);
+
+  // Timer Logic
+  useEffect(() => {
+    // Reset timer when index changes
+    setTimeLeft(5);
+    if (autoNextTimeoutRef.current) {
+      clearTimeout(autoNextTimeoutRef.current);
+      autoNextTimeoutRef.current = null;
+    }
+  }, [currentIndex]);
+
+  useEffect(() => {
+    // If answer is shown, stop countdown
+    if (isFlipped) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleAutoFlip();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentIndex, isFlipped]);
+
+  const handleAutoFlip = () => {
+    setIsFlipped(true); // Show Meaning
+    
+    // Auto advance after 1.5 seconds
+    autoNextTimeoutRef.current = window.setTimeout(() => {
+      if (currentIndex < shuffledWords.length - 1) {
+        setIsFlipped(false);
+        setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
+      }
+    }, 1500);
+  };
 
   const handleShuffle = () => {
     const newOrder = [...words];
@@ -31,6 +75,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   };
 
   const handleNext = () => {
+    if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
     if (currentIndex < shuffledWords.length - 1) {
       setIsFlipped(false);
       setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
@@ -38,6 +83,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   };
 
   const handlePrev = () => {
+    if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
     if (currentIndex > 0) {
       setIsFlipped(false);
       setTimeout(() => setCurrentIndex(prev => prev - 1), 150);
@@ -47,11 +93,22 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const handleCardClick = () => {
     if (!isFlipped) {
       setIsFlipped(true);
+      // Even if manually flipped, we don't necessarily auto-advance immediately unless desired.
+      // Current logic: Manual flip stops timer (due to isFlipped=true), user controls next.
+      // If you want auto-advance even on manual flip, uncomment below:
+      /*
+      autoNextTimeoutRef.current = window.setTimeout(() => {
+        if (currentIndex < shuffledWords.length - 1) {
+          handleNext();
+        }
+      }, 1500);
+      */
     } else {
+      // If already flipped, click moves next
       if (currentIndex < shuffledWords.length - 1) {
         handleNext();
       } else {
-        setIsFlipped(false);
+        setIsFlipped(false); // Just flip back if last
       }
     }
   };
@@ -77,10 +134,20 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
           </div>
         </div>
         
-        {/* Badge Style Counter */}
-        <div className="bg-white px-5 py-3 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-gray-100 flex items-baseline gap-1.5">
-          <span className="text-3xl font-black text-indigo-600 leading-none">{currentIndex + 1}</span>
-          <span className="text-sm font-bold text-gray-400">/ {shuffledWords.length}</span>
+        <div className="flex items-center gap-3">
+            {/* Timer Badge */}
+            {!isFlipped && (
+                <div className={`flex flex-col items-center px-3 py-1 rounded-xl border-2 transition-colors ${timeLeft <= 3 ? 'border-red-100 bg-red-50' : 'border-indigo-100 bg-indigo-50'}`}>
+                    <span className={`text-[10px] font-black uppercase ${timeLeft <= 3 ? 'text-red-400' : 'text-indigo-400'}`}>Time</span>
+                    <span className={`text-xl font-black leading-none ${timeLeft <= 3 ? 'text-red-600 animate-pulse' : 'text-indigo-600'}`}>{timeLeft}s</span>
+                </div>
+            )}
+
+            {/* Counter */}
+            <div className="bg-white px-5 py-3 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-gray-100 flex items-baseline gap-1.5">
+              <span className="text-3xl font-black text-indigo-600 leading-none">{currentIndex + 1}</span>
+              <span className="text-sm font-bold text-gray-400">/ {shuffledWords.length}</span>
+            </div>
         </div>
       </div>
 
@@ -114,7 +181,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
              </div>
 
              <div className="flex justify-center h-10">
-                <p className="text-sm text-gray-300 font-bold animate-pulse">탭하여 뜻 확인</p>
+                <p className="text-sm text-gray-300 font-bold animate-pulse">
+                    {timeLeft > 0 ? `${timeLeft}초 후 자동 공개` : '탭하여 뜻 확인'}
+                </p>
              </div>
           </div>
 
@@ -140,7 +209,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
 
              <div className="flex justify-center h-10">
                {currentIndex < shuffledWords.length - 1 ? (
-                 <p className="text-sm text-indigo-200 font-bold animate-pulse">다음 단어로 넘어가기</p>
+                 <p className="text-sm text-indigo-200 font-bold animate-pulse">다음 단어로 넘어가는 중...</p>
                ) : (
                  <p className="text-sm text-indigo-200 font-bold">마지막 단어입니다</p>
                )}
@@ -177,7 +246,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
            <span className="text-lg">🔀</span> 순서 섞기
          </button>
          <button onClick={onFinish} className="text-sm font-bold text-gray-400 hover:text-indigo-600 flex items-center gap-2 transition-colors py-2">
-           <span className="text-lg">🚪</span> 그만하기
+           <span className="text-lg">🚪 그만하기</span>
          </button>
       </div>
 
