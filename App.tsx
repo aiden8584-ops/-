@@ -38,16 +38,26 @@ function App() {
   }, []);
 
   const saveResult = (result: QuizResult) => {
-    const existing = localStorage.getItem(RESULT_STORAGE_KEY);
-    const results: QuizResult[] = existing ? JSON.parse(existing) : [];
-    results.push(result);
-    localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
+    // Only save to local storage and google sheet if it is TEST mode
+    if (result.mode === 'TEST') {
+      const existing = localStorage.getItem(RESULT_STORAGE_KEY);
+      const results: QuizResult[] = existing ? JSON.parse(existing) : [];
+      results.push(result);
+      localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
+    }
+    
     setLastResult(result);
 
-    const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || APP_CONFIG.scriptUrl;
-    if (scriptUrl) {
-      setSubmissionStatus('submitting');
-      submitResultToSheet(scriptUrl, result).then(success => setSubmissionStatus(success ? 'success' : 'error'));
+    // Submission logic
+    if (result.mode === 'TEST') {
+      const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || APP_CONFIG.scriptUrl;
+      if (scriptUrl) {
+        setSubmissionStatus('submitting');
+        submitResultToSheet(scriptUrl, result).then(success => setSubmissionStatus(success ? 'success' : 'error'));
+      }
+    } else {
+      // Practice mode doesn't submit
+      setSubmissionStatus('idle');
     }
   };
 
@@ -80,8 +90,8 @@ function App() {
     localStorage.setItem(INCORRECT_STORAGE_KEY, JSON.stringify(records));
   };
 
-  const handleStartQuiz = async (name: string, className: string, testDate: string, settings: QuizSettings) => {
-    setSession({ name, className, testDate, settings });
+  const handleStartQuiz = async (name: string, className: string, testDate: string, settings: QuizSettings, mode: 'TEST' | 'PRACTICE') => {
+    setSession({ name, className, testDate, settings, mode });
     setIsLoading(true);
     setLoadingMessage(`단어 데이터를 불러오는 중...`);
     setIsReviewMode(false);
@@ -89,9 +99,14 @@ function App() {
     try {
       const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
       if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
+      
       const sheetWords = await fetchWordsFromSheet(sheetId, className);
-      setLoadingMessage(`시험지를 생성 중입니다...`);
-      const generatedQuestions = await generateQuizQuestions(settings, sheetWords);
+      
+      setLoadingMessage(mode === 'PRACTICE' ? '전체 단어 연습을 생성 중입니다...' : '시험지를 생성 중입니다...');
+      
+      // Pass mode info to generator
+      const generatedQuestions = await generateQuizQuestions(settings, sheetWords, mode === 'PRACTICE');
+      
       setQuestions(generatedQuestions);
       setCurrentView(AppView.QUIZ);
     } catch (error: any) {
@@ -105,7 +120,10 @@ function App() {
   const handleQuizComplete = (score: number, total: number, timeSeconds: number, wrongQuestions: Question[]) => {
     if (!session && !isReviewMode) return;
     const nameToUse = session?.name || "익명 학생";
+    
+    // Always update incorrect words locally for practice functionality
     updateIncorrectWords(nameToUse, questions, wrongQuestions);
+    
     const result: QuizResult = {
       studentName: nameToUse,
       className: session?.className || "복습",
@@ -114,10 +132,13 @@ function App() {
       totalQuestions: total,
       timeTakenSeconds: timeSeconds,
       timestamp: new Date().toISOString(),
-      incorrectQuestions: wrongQuestions, // Save wrong questions for immediate review
+      incorrectQuestions: wrongQuestions,
+      mode: session?.mode || 'TEST'
     };
+
     if (!isReviewMode) saveResult(result);
     else setLastResult(result);
+    
     setCurrentView(AppView.RESULT);
   };
 
@@ -132,11 +153,14 @@ function App() {
                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
             </div>
             <h1 className="text-xl font-bold tracking-tight">PIF영어학원</h1>
+            {session?.mode === 'PRACTICE' && (
+              <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold ml-2">연습모드</span>
+            )}
           </div>
           {currentView === AppView.LANDING && (
             <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium">선생님</button>
           )}
-          {(currentView === AppView.TEACHER_DASHBOARD || currentView === AppView.TEACHER_LOGIN) && (
+          {(currentView === AppView.TEACHER_DASHBOARD || currentView === AppView.TEACHER_LOGIN || currentView === AppView.QUIZ || currentView === AppView.RESULT) && (
             <button onClick={handleLogout} className="text-sm text-gray-500 font-medium">닫기</button>
           )}
         </div>

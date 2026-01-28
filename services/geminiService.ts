@@ -31,34 +31,45 @@ const getDistractors = (pool: string[], correct: string, count: number = 3): str
 /**
  * Generates a quiz locally using sheet words as distractors.
  * Includes logic to prevent consecutive answer positions.
+ * Supports Practice Mode (all words).
  */
-const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Question[] => {
-  const dist = settings.typeDistribution;
-  const totalNeeded = dist.engToKor + dist.korToEng + dist.context;
-  const actualTotal = Math.min(sheetWords.length, totalNeeded);
+const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPractice: boolean = false): Question[] => {
+  let targetWords: SheetWord[] = [];
   
-  const shuffledSource = shuffleArray(sheetWords);
-  const limitedWords = shuffledSource.slice(0, actualTotal);
+  if (isPractice) {
+    // PRACTICE MODE: Use ALL words, shuffled
+    targetWords = shuffleArray(sheetWords);
+  } else {
+    // TEST MODE: Slice based on settings
+    const dist = settings.typeDistribution;
+    const totalNeeded = dist.engToKor + dist.korToEng + dist.context;
+    const actualTotal = Math.min(sheetWords.length, totalNeeded);
+    const shuffledSource = shuffleArray(sheetWords);
+    targetWords = shuffledSource.slice(0, actualTotal);
+  }
   
   const allMeanings = sheetWords.map(sw => sw.meaning);
   const allWords = sheetWords.map(sw => sw.word);
 
   let currentEK = 0;
   // Local quiz maps Context -> EngToKor fallback
-  const targetEK = dist.engToKor + dist.context; 
+  // In practice mode, we just split 50/50 roughly
+  const targetEK = isPractice ? Math.ceil(targetWords.length / 2) : (settings.typeDistribution.engToKor + settings.typeDistribution.context);
   
   let lastAnswerIndex = -1;
 
-  return limitedWords.map((sw, idx) => {
+  return targetWords.map((sw, idx) => {
     let showWord = '';
     let correctAnswer = '';
     let distractorsPool: string[] = [];
     
     // Determine type
     let type: 'engToKor' | 'korToEng' = 'engToKor';
-    if (currentEK < targetEK) {
+    
+    // Simple distribution logic
+    if (currentEK > 0) {
       type = 'engToKor';
-      currentEK++;
+      currentEK--;
     } else {
       type = 'korToEng';
     }
@@ -99,12 +110,18 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings): Que
   });
 };
 
-export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?: SheetWord[]): Promise<Question[]> => {
+export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?: SheetWord[], isPractice: boolean = false): Promise<Question[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = "gemini-3-flash-preview";
   
   if (!sheetWords || sheetWords.length === 0) {
     throw new Error("시험을 생성할 단어 데이터가 없습니다.");
+  }
+
+  // FORCE LOCAL GENERATION FOR PRACTICE MODE
+  // AI generation is too slow/expensive for "All Words" (e.g. 200 words)
+  if (isPractice) {
+    return generateLocalQuiz(sheetWords, settings, true);
   }
 
   const dist = settings.typeDistribution;
@@ -211,6 +228,6 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
 
   } catch (error: any) {
     console.warn("Gemini API Error. Falling back to local generation:", error.message);
-    return generateLocalQuiz(sheetWords, settings);
+    return generateLocalQuiz(sheetWords, settings, isPractice);
   }
 };

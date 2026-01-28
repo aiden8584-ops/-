@@ -30,6 +30,7 @@ export interface QuizResult {
   timeTakenSeconds: number;
   timestamp: string; // ISO string
   incorrectQuestions?: Question[]; // Added for immediate review
+  mode?: 'TEST' | 'PRACTICE'; // Added to distinguish result types
 }
 
 export interface IncorrectWord {
@@ -57,6 +58,7 @@ export interface UserSession {
   className: string;
   testDate: string;
   settings: QuizSettings;
+  mode: 'TEST' | 'PRACTICE';
 }
 
 export interface SheetWord {

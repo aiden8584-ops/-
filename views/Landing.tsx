@@ -6,7 +6,7 @@ import { fetchSheetTabs } from '../services/sheetService';
 import { APP_CONFIG } from '../config';
 
 interface LandingProps {
-  onStart: (name: string, className: string, date: string, settings: QuizSettings) => void;
+  onStart: (name: string, className: string, date: string, settings: QuizSettings, mode: 'TEST' | 'PRACTICE') => void;
   onChangeView: (view: AppView) => void;
 }
 
@@ -117,10 +117,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleStart = (mode: 'TEST' | 'PRACTICE') => {
     if (name.trim() && className.trim() && testDate) {
-      onStart(name.trim(), className.trim(), testDate, quizSettings);
+      onStart(name.trim(), className.trim(), testDate, quizSettings, mode);
     }
   };
 
@@ -135,7 +134,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           </p>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-8">
+        <form onSubmit={(e) => e.preventDefault()} className="p-8 md:p-10 space-y-8">
           {!hasSheetId ? (
              <div className="bg-amber-50 border-2 border-amber-100 rounded-3xl p-8 text-center animate-pop">
               <h3 className="text-lg font-bold text-amber-900 mb-2">시험지 정보가 없습니다</h3>
@@ -181,8 +180,25 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                 <input type="date" required value={testDate} onChange={(e) => setTestDate(e.target.value)} className="w-full px-6 py-4 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white text-lg font-bold text-gray-800" />
               </div>
 
-              <div className="pt-4">
-                <Button type="submit" fullWidth disabled={!className || !name || !testDate} className="text-xl py-6 shadow-2xl rounded-[1.5rem] font-black">시험 시작하기</Button>
+              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button 
+                  type="button" 
+                  onClick={() => handleStart('TEST')}
+                  disabled={!className || !name || !testDate} 
+                  className="text-xl py-6 shadow-2xl rounded-[1.5rem] font-black"
+                >
+                  시험 시작하기
+                </Button>
+                
+                <Button 
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleStart('PRACTICE')}
+                  disabled={!className || !name || !testDate} 
+                  className="text-lg py-6 rounded-[1.5rem] font-bold border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50"
+                >
+                  전체 단어 연습
+                </Button>
               </div>
             </>
           )}
