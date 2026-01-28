@@ -34,8 +34,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const handleNext = () => {
     if (currentIndex < shuffledWords.length - 1) {
       setIsFlipped(false);
-      // Small delay to allow the flip animation to reset visually if needed, 
-      // though we want it instant for 'next card' feel.
+      // Small delay to allow the flip animation to reset visually if needed
       setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
     }
   };
@@ -49,15 +48,14 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
 
   const handleCardClick = () => {
     if (!isFlipped) {
-      // If showing front, flip to back
+      // If showing front, flip to back (Show Meaning)
       setIsFlipped(true);
     } else {
-      // If showing back (meaning), go to next card
+      // If showing back (Meaning), go to next card
       if (currentIndex < shuffledWords.length - 1) {
         handleNext();
       } else {
-        // Optional: If it's the last card, maybe just flip back or do nothing
-        // For now, let's just flip back so they can see English again if they want
+        // If it's the last card, just flip back to front
         setIsFlipped(false);
       }
     }
@@ -95,34 +93,34 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
           
           {/* FRONT (English) */}
           <div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 flex flex-col p-6">
-             <div className="h-12 flex items-center justify-center">
+             <div className="shrink-0 h-12 flex items-center justify-center">
                 <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">English</span>
              </div>
              
-             <div className="flex-1 flex items-center justify-center w-full overflow-hidden">
-                <h3 className="text-3xl md:text-4xl font-black text-gray-800 break-words text-center px-4 leading-tight">
+             <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden">
+                <h3 className="text-3xl md:text-4xl font-black text-gray-800 break-words text-center leading-tight">
                   {currentWord.word}
                 </h3>
              </div>
 
-             <div className="h-12 flex items-center justify-center">
+             <div className="shrink-0 h-12 flex items-center justify-center">
                 <p className="text-xs text-gray-400 font-medium animate-pulse">터치해서 뜻 확인하기</p>
              </div>
           </div>
 
           {/* BACK (Meaning) */}
           <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl flex flex-col p-6 text-white">
-             <div className="h-12 flex items-center justify-center">
+             <div className="shrink-0 h-12 flex items-center justify-center">
                 <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Meaning</span>
              </div>
 
-             <div className="flex-1 flex items-center justify-center w-full overflow-hidden">
-                <h3 className="text-2xl md:text-3xl font-bold break-keep text-center px-4 leading-snug">
+             <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden">
+                <h3 className="text-2xl md:text-3xl font-bold break-keep text-center leading-snug">
                   {currentWord.meaning}
                 </h3>
              </div>
 
-             <div className="h-12 flex items-center justify-center">
+             <div className="shrink-0 h-12 flex items-center justify-center">
                {currentIndex < shuffledWords.length - 1 ? (
                  <p className="text-xs text-indigo-200 font-medium animate-pulse">터치해서 다음 단어</p>
                ) : (
