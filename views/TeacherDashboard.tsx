@@ -12,6 +12,8 @@ const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
 
 const APP_VERSION = "v1.20 (Custom Distribution)";
 
+const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
+
 const TeacherDashboard: React.FC = () => {
   const [sheetId, setSheetId] = useState('');
   const [scriptUrl, setScriptUrl] = useState('');
@@ -21,8 +23,9 @@ const TeacherDashboard: React.FC = () => {
   const [timeLimit, setTimeLimit] = useState(APP_CONFIG.defaultSettings.timeLimitPerQuestion);
   const [distribution, setDistribution] = useState<TypeDistribution>(APP_CONFIG.defaultSettings.typeDistribution);
 
-  const [availableTabs, setAvailableTabs] = useState<string[]>([]);
+  const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   const [selectedClass, setSelectedClass] = useState('');
+  const [isCustomClass, setIsCustomClass] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'none' | 'success' | 'success_manual' | 'fail'>('none');
   const [isCopied, setIsCopied] = useState(false);
@@ -41,8 +44,9 @@ const TeacherDashboard: React.FC = () => {
       }
     }
 
-    if (localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId) {
-      loadTabs(localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId);
+    const savedSheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
+    if (savedSheetId) {
+      loadTabs(savedSheetId);
     }
   }, []);
 
@@ -62,10 +66,13 @@ const TeacherDashboard: React.FC = () => {
         setAvailableTabs(tabs);
         setConnectionStatus('success');
       } else {
+        // Even if fetch fails, we keep presets for dropdown usage
+        setAvailableTabs(PRESET_TABS);
         const isAvailable = await checkSheetAvailability(id);
         setConnectionStatus(isAvailable ? 'success_manual' : 'fail');
       }
     } catch (e) {
+      setAvailableTabs(PRESET_TABS);
       setConnectionStatus('fail');
     } finally {
       setIsRefreshing(false);
@@ -211,15 +218,46 @@ const TeacherDashboard: React.FC = () => {
           <div className="space-y-6">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">1. 배포할 수업반 선택</label>
-              {availableTabs.length > 0 ? (
-                <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full px-4 py-4 border-2 border-indigo-100 rounded-xl font-bold text-gray-700 bg-indigo-50/30 outline-none">
+              
+              <div className="relative w-full">
+                <select 
+                  value={isCustomClass ? "custom" : selectedClass} 
+                  onChange={(e) => {
+                    if (e.target.value === "custom") {
+                      setIsCustomClass(true);
+                      setSelectedClass("");
+                    } else {
+                      setIsCustomClass(false);
+                      setSelectedClass(e.target.value);
+                    }
+                  }} 
+                  className="w-full px-4 py-4 border-2 border-indigo-100 rounded-xl font-bold text-gray-700 bg-white outline-none appearance-none cursor-pointer hover:border-indigo-300 transition-colors shadow-sm"
+                >
                   <option value="">-- 반 선택 --</option>
                   {availableTabs.map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="custom">✎ 직접 입력...</option>
                 </select>
-              ) : (
-                <input type="text" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} placeholder="탭 이름을 입력하세요" className="w-full px-4 py-4 border-2 border-indigo-100 rounded-xl font-bold" />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400">
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                   </svg>
+                </div>
+              </div>
+
+              {isCustomClass && (
+                <div className="mt-2 animate-pop">
+                  <input 
+                    type="text" 
+                    value={selectedClass} 
+                    onChange={(e) => setSelectedClass(e.target.value)} 
+                    placeholder="수업반 이름을 입력하세요 (예: 중등A반)" 
+                    className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl font-bold text-indigo-700 placeholder-indigo-300 bg-indigo-50 focus:bg-white outline-none transition-all"
+                    autoFocus
+                  />
+                </div>
               )}
             </div>
+
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">2. 링크 공유 및 확인</label>
               <div className="flex flex-col gap-2">
