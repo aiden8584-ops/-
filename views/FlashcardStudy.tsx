@@ -34,6 +34,8 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const handleNext = () => {
     if (currentIndex < shuffledWords.length - 1) {
       setIsFlipped(false);
+      // Small delay to allow the flip animation to reset visually if needed, 
+      // though we want it instant for 'next card' feel.
       setTimeout(() => setCurrentIndex(prev => prev + 1), 150);
     }
   };
@@ -46,7 +48,19 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   };
 
   const handleCardClick = () => {
-    setIsFlipped(!isFlipped);
+    if (!isFlipped) {
+      // If showing front, flip to back
+      setIsFlipped(true);
+    } else {
+      // If showing back (meaning), go to next card
+      if (currentIndex < shuffledWords.length - 1) {
+        handleNext();
+      } else {
+        // Optional: If it's the last card, maybe just flip back or do nothing
+        // For now, let's just flip back so they can see English again if they want
+        setIsFlipped(false);
+      }
+    }
   };
 
   if (shuffledWords.length === 0) return null;
@@ -77,19 +91,44 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
 
       {/* Flashcard Area */}
       <div className="flex-1 relative perspective-1000 min-h-[400px] mb-8 group cursor-pointer" onClick={handleCardClick}>
-        <div className={`relative w-full h-full text-center transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+        <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
           
-          {/* FRONT */}
-          <div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 flex flex-col items-center justify-center p-8">
-             <span className="text-xs font-black text-indigo-300 uppercase tracking-widest absolute top-8">English</span>
-             <h3 className="text-4xl font-black text-gray-800 break-words leading-tight">{currentWord.word}</h3>
-             <p className="absolute bottom-8 text-xs text-gray-400 font-medium animate-pulse">터치해서 뜻 확인하기</p>
+          {/* FRONT (English) */}
+          <div className="absolute w-full h-full backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 flex flex-col p-6">
+             <div className="h-12 flex items-center justify-center">
+                <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">English</span>
+             </div>
+             
+             <div className="flex-1 flex items-center justify-center w-full overflow-hidden">
+                <h3 className="text-3xl md:text-4xl font-black text-gray-800 break-words text-center px-4 leading-tight">
+                  {currentWord.word}
+                </h3>
+             </div>
+
+             <div className="h-12 flex items-center justify-center">
+                <p className="text-xs text-gray-400 font-medium animate-pulse">터치해서 뜻 확인하기</p>
+             </div>
           </div>
 
-          {/* BACK */}
-          <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 text-white">
-             <span className="text-xs font-black text-indigo-300 uppercase tracking-widest absolute top-8">Meaning</span>
-             <h3 className="text-3xl font-bold leading-snug break-keep">{currentWord.meaning}</h3>
+          {/* BACK (Meaning) */}
+          <div className="absolute w-full h-full backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl flex flex-col p-6 text-white">
+             <div className="h-12 flex items-center justify-center">
+                <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Meaning</span>
+             </div>
+
+             <div className="flex-1 flex items-center justify-center w-full overflow-hidden">
+                <h3 className="text-2xl md:text-3xl font-bold break-keep text-center px-4 leading-snug">
+                  {currentWord.meaning}
+                </h3>
+             </div>
+
+             <div className="h-12 flex items-center justify-center">
+               {currentIndex < shuffledWords.length - 1 ? (
+                 <p className="text-xs text-indigo-200 font-medium animate-pulse">터치해서 다음 단어</p>
+               ) : (
+                 <p className="text-xs text-indigo-200 font-medium">마지막 단어입니다</p>
+               )}
+             </div>
           </div>
 
         </div>
