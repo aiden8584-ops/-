@@ -62,7 +62,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const progress = ((currentIndex + 1) / shuffledWords.length) * 100;
 
   return (
-    <div className="max-w-md mx-auto h-full flex flex-col relative pb-6 animate-pop">
+    <div className="max-w-lg mx-auto h-full flex flex-col relative pb-6 animate-pop">
       {/* Background Decoration - Subtle Blobs */}
       <div className="absolute top-10 -left-10 w-48 h-48 bg-indigo-200 rounded-full blur-3xl opacity-20 -z-10 mix-blend-multiply animate-pulse"></div>
       <div className="absolute top-40 -right-10 w-48 h-48 bg-purple-200 rounded-full blur-3xl opacity-20 -z-10 mix-blend-multiply animate-pulse delay-700"></div>
@@ -90,7 +90,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
       </div>
 
       {/* Flashcard Area */}
-      <div className="flex-1 relative perspective-1000 mx-4 mb-8 group cursor-pointer select-none min-h-[400px]" onClick={handleCardClick}>
+      <div className="flex-1 relative perspective-1000 mx-4 mb-8 group cursor-pointer select-none min-h-[520px]" onClick={handleCardClick}>
         <div className={`relative w-full h-full transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) transform-style-3d will-change-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
           
           {/* FRONT (English) */}
@@ -108,7 +108,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
              
              {/* Word Content */}
              <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-5xl md:text-7xl font-black text-gray-800 break-words text-center leading-tight tracking-tight drop-shadow-sm">
+                <h3 className="text-5xl md:text-7xl font-black text-gray-900 break-words text-center leading-tight tracking-tight drop-shadow-sm">
                   {currentWord?.word || ''}
                 </h3>
              </div>
