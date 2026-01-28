@@ -89,13 +89,13 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
         <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
       </div>
 
-      {/* Flashcard Area - MAXIMIZED VERTICAL HEIGHT */}
-      <div className="w-full relative perspective-1000 mb-8 group cursor-pointer select-none h-[65vh] min-h-[500px]" onClick={handleCardClick}>
+      {/* Flashcard Area - HEIGHT REDUCED to ensure buttons are visible */}
+      <div className="w-full relative perspective-1000 mb-6 group cursor-pointer select-none h-[45vh] min-h-[350px]" onClick={handleCardClick}>
         <div className={`relative w-full h-full transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) transform-style-3d will-change-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
           
           {/* FRONT (English) */}
           <div 
-            className="absolute inset-0 backface-hidden bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgb(0,0,0,0.08)] border border-gray-100 flex flex-col justify-between p-8 md:p-12"
+            className="absolute inset-0 backface-hidden bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgb(0,0,0,0.08)] border border-gray-100 flex flex-col justify-between p-6 md:p-10"
             style={{ 
               transform: "rotateY(0deg) translateZ(1px)", 
               WebkitBackfaceVisibility: "hidden",
@@ -106,9 +106,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 <span className="px-4 py-1.5 bg-gray-50 text-gray-400 text-xs font-black tracking-widest rounded-full uppercase border border-gray-100">English</span>
              </div>
              
-             {/* Word Content - Optimized Font Size */}
+             {/* Word Content - Font Size Adjusted */}
              <div className="flex-1 flex items-center justify-center p-4" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-5xl md:text-7xl font-black text-gray-900 break-words text-center leading-tight tracking-tight drop-shadow-sm">
+                <h3 className="text-4xl md:text-6xl font-black text-gray-900 break-words text-center leading-tight tracking-tight drop-shadow-sm">
                   {currentWord?.word || ''}
                 </h3>
              </div>
@@ -120,7 +120,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
 
           {/* BACK (Meaning) */}
           <div 
-            className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-[2.5rem] shadow-[0_20px_50px_rgb(79,70,229,0.3)] flex flex-col justify-between p-8 md:p-12 text-white ring-1 ring-white/10"
+            className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-[2.5rem] shadow-[0_20px_50px_rgb(79,70,229,0.3)] flex flex-col justify-between p-6 md:p-10 text-white ring-1 ring-white/10"
             style={{ 
               transform: "rotateY(180deg) translateZ(1px)", 
               WebkitBackfaceVisibility: "hidden",
@@ -131,9 +131,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 <span className="px-4 py-1.5 bg-white/10 text-indigo-100 text-xs font-black tracking-widest rounded-full uppercase backdrop-blur-sm">Meaning</span>
              </div>
 
-             {/* Meaning Content - Optimized Font Size */}
+             {/* Meaning Content - Font Size Adjusted */}
              <div className="flex-1 flex items-center justify-center p-4" style={{ transform: "translate3d(0,0,0)" }}>
-                <h3 className="text-3xl md:text-5xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
+                <h3 className="text-2xl md:text-4xl font-bold break-keep text-center leading-relaxed text-white drop-shadow-md">
                   {currentWord?.meaning || ''}
                 </h3>
              </div>
