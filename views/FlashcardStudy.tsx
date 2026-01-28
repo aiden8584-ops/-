@@ -89,40 +89,49 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
           
           {/* FRONT (English) */}
           <div 
-            className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 grid grid-rows-[3rem_1fr_3rem] p-6"
-            style={{ transform: "rotateY(0deg) translateZ(1px)", WebkitBackfaceVisibility: "hidden" }}
+            className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl border-2 border-indigo-50 flex flex-col justify-between p-6"
+            style={{ 
+              transform: "rotateY(0deg) translateZ(1px)", 
+              WebkitBackfaceVisibility: "hidden",
+              zIndex: isFlipped ? 0 : 2 
+            }}
           >
-             <div className="flex items-center justify-center">
+             <div className="flex items-center justify-center h-12">
                 <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">English</span>
              </div>
              
-             <div className="flex items-center justify-center w-full px-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
+             {/* Center Content - Removed Scroll to fix mobile rendering issues */}
+             <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
                 <h3 className="text-3xl md:text-5xl font-black text-gray-900 break-words text-center leading-tight">
                   {currentWord?.word || ''}
                 </h3>
              </div>
 
-             <div className="flex items-center justify-center">
+             <div className="flex items-center justify-center h-12">
                 <p className="text-xs text-gray-400 font-medium animate-pulse">터치해서 뜻 확인하기</p>
              </div>
           </div>
 
           {/* BACK (Meaning) */}
           <div 
-            className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl grid grid-rows-[3rem_1fr_3rem] p-6 text-white"
-            style={{ transform: "rotateY(180deg) translateZ(1px)", WebkitBackfaceVisibility: "hidden" }}
+            className="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-600 rounded-3xl shadow-xl flex flex-col justify-between p-6 text-white"
+            style={{ 
+              transform: "rotateY(180deg) translateZ(1px)", 
+              WebkitBackfaceVisibility: "hidden",
+              zIndex: isFlipped ? 2 : 0
+            }}
           >
-             <div className="flex items-center justify-center">
+             <div className="flex items-center justify-center h-12">
                 <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Meaning</span>
              </div>
 
-             <div className="flex items-center justify-center w-full px-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
+             <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
                 <h3 className="text-2xl md:text-4xl font-bold break-keep text-center leading-snug text-white">
                   {currentWord?.meaning || ''}
                 </h3>
              </div>
 
-             <div className="flex items-center justify-center">
+             <div className="flex items-center justify-center h-12">
                {currentIndex < shuffledWords.length - 1 ? (
                  <p className="text-xs text-indigo-200 font-medium animate-pulse">터치해서 다음 단어</p>
                ) : (
