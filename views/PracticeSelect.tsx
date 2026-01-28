@@ -8,7 +8,7 @@ interface PracticeSelectProps {
   onBack: () => void;
 }
 
-const CHUNK_SIZE = 30;
+const CHUNK_SIZE = 40;
 
 const PracticeSelect: React.FC<PracticeSelectProps> = ({ totalWords, onSelectSet, onBack }) => {
   const totalSets = Math.ceil(totalWords.length / CHUNK_SIZE);
@@ -22,7 +22,7 @@ const PracticeSelect: React.FC<PracticeSelectProps> = ({ totalWords, onSelectSet
           <h2 className="text-2xl font-black mb-2 relative z-10">단어 연습 세트 선택</h2>
           <p className="text-green-100 text-sm font-medium relative z-10">
             총 {totalWords.length}개의 단어가 있습니다. <br/>
-            학습할 범위를 선택해주세요. (30개씩 분할)
+            학습할 범위를 선택해주세요. (40개씩 분할)
           </p>
         </div>
 
