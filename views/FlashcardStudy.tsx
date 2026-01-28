@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { SheetWord } from '../types';
-import Button from '../components/Button';
 
 interface FlashcardStudyProps {
   words: SheetWord[];
@@ -63,72 +62,73 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const progress = ((currentIndex + 1) / shuffledWords.length) * 100;
 
   return (
-    <div className="max-w-md mx-auto h-full flex flex-col animate-pop relative">
-      {/* Background Decoration */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-indigo-300 rounded-full blur-3xl opacity-20 -z-10 animate-pulse"></div>
-      <div className="absolute bottom-40 right-10 w-40 h-40 bg-purple-300 rounded-full blur-3xl opacity-20 -z-10 animate-pulse delay-1000"></div>
+    <div className="max-w-md mx-auto h-full flex flex-col relative pb-6 animate-pop">
+      {/* Background Decoration - Subtle Blobs */}
+      <div className="absolute top-10 -left-10 w-48 h-48 bg-indigo-200 rounded-full blur-3xl opacity-20 -z-10 mix-blend-multiply animate-pulse"></div>
+      <div className="absolute top-40 -right-10 w-48 h-48 bg-purple-200 rounded-full blur-3xl opacity-20 -z-10 mix-blend-multiply animate-pulse delay-700"></div>
 
       {/* Header Info */}
-      <div className="flex justify-between items-end mb-6 px-4 pt-4">
-        <div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight leading-none">{setTitle}</h2>
-          <div className="flex items-center gap-2 mt-2">
-             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${isShuffled ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
-                {isShuffled ? '🔀 순서 섞임' : '🔢 기본 순서'}
-             </span>
+      <div className="flex justify-between items-center px-4 pt-4 pb-2">
+        <div className="flex flex-col">
+          <h2 className="text-xl font-black text-gray-800 tracking-tight">{setTitle}</h2>
+          <div className="flex items-center gap-1.5 mt-1">
+             <div className={`w-2 h-2 rounded-full transition-colors ${isShuffled ? 'bg-indigo-500' : 'bg-gray-300'}`}></div>
+             <span className="text-xs font-bold text-gray-500">{isShuffled ? '순서 섞임' : '기본 순서'}</span>
           </div>
         </div>
-        <div className="text-right">
-          <span className="text-4xl font-black text-indigo-600 leading-none tracking-tighter">{currentIndex + 1}</span>
-          <span className="text-sm font-bold text-gray-300 ml-1">/ {shuffledWords.length}</span>
+        
+        {/* Badge Style Counter */}
+        <div className="bg-white px-4 py-2 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-gray-100 flex items-baseline gap-1">
+          <span className="text-2xl font-black text-indigo-600 leading-none">{currentIndex + 1}</span>
+          <span className="text-xs font-bold text-gray-400">/ {shuffledWords.length}</span>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="mx-4 mb-8 bg-gray-100 rounded-full h-1.5 overflow-hidden ring-1 ring-gray-100">
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(99,102,241,0.5)]" style={{ width: `${progress}%` }}></div>
+      <div className="mx-4 mt-2 mb-6 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out" style={{ width: `${progress}%` }}></div>
       </div>
 
       {/* Flashcard Area */}
-      <div className="flex-1 relative perspective-1000 min-h-[420px] mb-8 mx-4 group cursor-pointer select-none" onClick={handleCardClick}>
-        <div className={`relative w-full h-full transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) transform-style-3d will-change-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
+      <div className="flex-1 relative perspective-1000 mx-4 mb-8 group cursor-pointer select-none min-h-[400px]" onClick={handleCardClick}>
+        <div className={`relative w-full h-full transition-transform duration-500 cubic-bezier(0.34, 1.56, 0.64, 1) transform-style-3d will-change-transform ${isFlipped ? 'rotate-y-180' : ''}`}>
           
           {/* FRONT (English) */}
           <div 
-            className="absolute inset-0 backface-hidden bg-white rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] border border-white ring-1 ring-gray-100 flex flex-col justify-between p-8"
+            className="absolute inset-0 backface-hidden bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col justify-between p-8"
             style={{ 
               transform: "rotateY(0deg) translateZ(1px)", 
               WebkitBackfaceVisibility: "hidden",
               zIndex: isFlipped ? 0 : 2 
             }}
           >
-             <div className="flex items-center justify-center h-10">
-                <span className="px-3 py-1 rounded-full bg-indigo-50 text-[10px] font-black text-indigo-400 uppercase tracking-widest">English</span>
+             <div className="flex justify-center h-8">
+                <span className="px-3 py-1 bg-gray-50 text-gray-400 text-[10px] font-black tracking-widest rounded-full uppercase border border-gray-100">English</span>
              </div>
              
-             {/* Content */}
+             {/* Word Content */}
              <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
                 <h3 className="text-4xl md:text-5xl font-black text-gray-800 break-words text-center leading-tight tracking-tight drop-shadow-sm">
                   {currentWord?.word || ''}
                 </h3>
              </div>
 
-             <div className="flex items-center justify-center h-10">
-                <p className="text-xs text-gray-300 font-bold animate-pulse">터치해서 뜻 확인</p>
+             <div className="flex justify-center h-8">
+                <p className="text-xs text-gray-300 font-bold animate-pulse">탭하여 뜻 확인</p>
              </div>
           </div>
 
           {/* BACK (Meaning) */}
           <div 
-            className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(79,70,229,0.4)] flex flex-col justify-between p-8 text-white ring-1 ring-white/20"
+            className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-[2rem] shadow-[0_8px_30px_rgb(79,70,229,0.3)] flex flex-col justify-between p-8 text-white ring-1 ring-white/10"
             style={{ 
               transform: "rotateY(180deg) translateZ(1px)", 
               WebkitBackfaceVisibility: "hidden",
               zIndex: isFlipped ? 2 : 0
             }}
           >
-             <div className="flex items-center justify-center h-10">
-                <span className="px-3 py-1 rounded-full bg-white/10 text-[10px] font-black text-indigo-100 uppercase tracking-widest backdrop-blur-sm">Meaning</span>
+             <div className="flex justify-center h-8">
+                <span className="px-3 py-1 bg-white/10 text-indigo-100 text-[10px] font-black tracking-widest rounded-full uppercase backdrop-blur-sm">Meaning</span>
              </div>
 
              <div className="flex-1 flex items-center justify-center p-2" style={{ transform: "translate3d(0,0,0)" }}>
@@ -137,9 +137,9 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
                 </h3>
              </div>
 
-             <div className="flex items-center justify-center h-10">
+             <div className="flex justify-center h-8">
                {currentIndex < shuffledWords.length - 1 ? (
-                 <p className="text-xs text-indigo-200 font-bold animate-pulse">화면을 눌러 다음 단어</p>
+                 <p className="text-xs text-indigo-200 font-bold animate-pulse">다음 단어로 넘어가기</p>
                ) : (
                  <p className="text-xs text-indigo-200 font-bold">마지막 단어입니다</p>
                )}
@@ -149,32 +149,34 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="grid grid-cols-2 gap-4 mb-4 mx-4">
-        <Button 
+      {/* Controls - Grid Layout with Hierarchy */}
+      <div className="grid grid-cols-[1fr_2fr] gap-3 mx-4 mb-2">
+        {/* Previous: Outline Style */}
+        <button 
           onClick={(e) => { e.stopPropagation(); handlePrev(); }} 
           disabled={currentIndex === 0}
-          variant="secondary"
-          className="rounded-2xl h-14 text-base font-bold border-0 shadow-sm bg-white text-gray-600 hover:bg-gray-50 active:scale-95 transition-transform"
+          className="h-14 rounded-2xl border-2 border-gray-200 bg-white text-gray-500 font-bold text-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-40 disabled:hover:bg-white transition-all active:scale-[0.98]"
         >
-          ← 이전
-        </Button>
-        <Button 
+          이전
+        </button>
+        
+        {/* Next: Solid Primary Style */}
+        <button 
           onClick={(e) => { e.stopPropagation(); handleNext(); }} 
           disabled={currentIndex === shuffledWords.length - 1}
-          variant="primary"
-          className="rounded-2xl h-14 text-base font-bold shadow-indigo-200 shadow-lg active:scale-95 transition-transform"
+          className="h-14 rounded-2xl bg-indigo-600 text-white font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 disabled:opacity-50 disabled:shadow-none transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
-          다음 →
-        </Button>
+          다음 단어 <span className="text-sm">→</span>
+        </button>
       </div>
 
-      <div className="flex justify-between gap-3 mx-4">
-         <button onClick={handleShuffle} className="text-[10px] font-bold text-gray-400 py-3 px-4 rounded-xl bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex-1 shadow-sm">
-           🔀 순서 섞기
+      {/* Footer Actions */}
+      <div className="flex justify-center gap-6 mt-4">
+         <button onClick={handleShuffle} className="text-xs font-bold text-gray-400 hover:text-indigo-600 flex items-center gap-1.5 transition-colors py-2">
+           <span className="text-base">🔀</span> 순서 섞기
          </button>
-         <button onClick={onFinish} className="text-[10px] font-bold text-gray-400 py-3 px-4 rounded-xl bg-white border border-gray-100 hover:bg-gray-50 transition-colors flex-1 shadow-sm">
-           🚪 목록으로
+         <button onClick={onFinish} className="text-xs font-bold text-gray-400 hover:text-indigo-600 flex items-center gap-1.5 transition-colors py-2">
+           <span className="text-base">🚪</span> 그만하기
          </button>
       </div>
 
