@@ -107,7 +107,8 @@ function App() {
       const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
       if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
       
-      const sheetWords = await fetchWordsFromSheet(sheetId, className);
+      // Updated: Pass mode to fetchWordsFromSheet to select correct columns (A/B or D/E)
+      const sheetWords = await fetchWordsFromSheet(sheetId, className, mode);
       
       if (mode === 'PRACTICE') {
         // PRACTICE MODE: Store raw words and go to selection screen

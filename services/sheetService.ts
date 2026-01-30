@@ -66,7 +66,7 @@ export const checkSheetAvailability = async (sheetId: string): Promise<boolean> 
   }
 };
 
-export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Promise<SheetWord[]> => {
+export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode: 'TEST' | 'PRACTICE' = 'TEST'): Promise<SheetWord[]> => {
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
   
   try {
@@ -83,17 +83,28 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
     const lines = text.split('\n');
     const words: SheetWord[] = [];
 
+    // Define column indices based on mode
+    // TEST Mode: A(0), B(1)
+    // PRACTICE Mode: D(3), E(4)
+    const wordColIdx = mode === 'PRACTICE' ? 3 : 0;
+    const meaningColIdx = mode === 'PRACTICE' ? 4 : 1;
+
     for (let i = 0; i < lines.length; i++) {
+      // Always skip the first row (Header)
+      if (i === 0) continue;
+
       const line = lines[i].trim();
       if (!line) continue;
 
       const cols = parseCSVLine(line);
       
-      if (cols.length >= 2) {
-        const word = cols[0];
-        const fullMeaning = cols[1];
+      // Check if we have enough columns for the requested indices
+      if (cols.length > Math.max(wordColIdx, meaningColIdx)) {
+        const word = cols[wordColIdx];
+        const fullMeaning = cols[meaningColIdx];
         
-        if (word.toLowerCase() === 'word' || word.toLowerCase() === 'english' || word.toLowerCase() === '단어') continue;
+        // Skip header-like keywords if they appear in data rows (legacy safety check)
+        if (word && (word.toLowerCase() === 'word' || word.toLowerCase() === 'english' || word.toLowerCase() === '단어')) continue;
 
         if (word && fullMeaning) {
           // Remove content within parentheses (e.g., "(adj) happy" -> "happy")
@@ -115,7 +126,8 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string): Pro
     }
 
     if (words.length === 0) {
-      throw new Error("탭은 찾았으나, 단어 데이터를 파싱하지 못했습니다. (A열: 영어, B열: 뜻 형식인지 확인)");
+      const colName = mode === 'PRACTICE' ? 'D, E열' : 'A, B열';
+      throw new Error(`데이터를 찾을 수 없습니다. (${colName}에 단어와 뜻이 있는지 확인해주세요)`);
     }
 
     return words;
