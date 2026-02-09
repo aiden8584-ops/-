@@ -10,7 +10,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
 
-const APP_VERSION = "v1.20 (Custom Distribution)";
+const APP_VERSION = "v1.30 (AI Toggle Support)";
 
 const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
 
@@ -22,6 +22,7 @@ const TeacherDashboard: React.FC = () => {
   // Quiz Settings
   const [timeLimit, setTimeLimit] = useState(APP_CONFIG.defaultSettings.timeLimitPerQuestion);
   const [distribution, setDistribution] = useState<TypeDistribution>(APP_CONFIG.defaultSettings.typeDistribution);
+  const [useAi, setUseAi] = useState<boolean>(APP_CONFIG.defaultSettings.useAi ?? true);
 
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   const [selectedClass, setSelectedClass] = useState('');
@@ -42,6 +43,9 @@ const TeacherDashboard: React.FC = () => {
       if (parsed.typeDistribution) {
         setDistribution(parsed.typeDistribution);
       }
+      if (parsed.useAi !== undefined) {
+        setUseAi(parsed.useAi);
+      }
     }
 
     const savedSheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
@@ -53,9 +57,10 @@ const TeacherDashboard: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       timeLimitPerQuestion: timeLimit,
-      typeDistribution: distribution
+      typeDistribution: distribution,
+      useAi: useAi
     }));
-  }, [timeLimit, distribution]);
+  }, [timeLimit, distribution, useAi]);
 
   const loadTabs = async (id: string) => {
     if (!id) return;
@@ -94,6 +99,10 @@ const TeacherDashboard: React.FC = () => {
     params.set('c_ctx', distribution.context.toString());
     
     params.set('t_limit', timeLimit.toString());
+    
+    // New param for AI toggle
+    params.set('use_ai', useAi.toString());
+
     params.set('date', new Date().toISOString().split('T')[0]);
     
     let url = baseUrl.trim() || window.location.origin + window.location.pathname;
@@ -101,17 +110,20 @@ const TeacherDashboard: React.FC = () => {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     
     return `${url}/?${params.toString()}`;
-  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit]);
+  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit, useAi]);
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
 
   const applyPreset = (type: 'balanced' | 'basic' | 'context_heavy') => {
     if (type === 'balanced') {
       setDistribution({ engToKor: 15, korToEng: 15, context: 20 });
+      setUseAi(true);
     } else if (type === 'basic') {
       setDistribution({ engToKor: 25, korToEng: 25, context: 0 });
+      setUseAi(false); // Basic often doesn't need AI
     } else if (type === 'context_heavy') {
       setDistribution({ engToKor: 10, korToEng: 10, context: 30 });
+      setUseAi(true);
     }
   };
 
@@ -131,17 +143,33 @@ const TeacherDashboard: React.FC = () => {
         </div>
         
         <div className="p-8">
-          {/* Preset Buttons */}
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-            <button onClick={() => applyPreset('basic')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-bold text-gray-600 transition-colors whitespace-nowrap">
-              ⚖️ 기본 (영한 25 / 한영 25)
-            </button>
-            <button onClick={() => applyPreset('balanced')} className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-full text-xs font-bold text-indigo-600 transition-colors whitespace-nowrap">
-              🎨 골고루 (영한 15 / 한영 15 / 빈칸 20)
-            </button>
-            <button onClick={() => applyPreset('context_heavy')} className="px-4 py-2 bg-purple-50 hover:bg-purple-100 rounded-full text-xs font-bold text-purple-600 transition-colors whitespace-nowrap">
-              🧠 빈칸 집중 (빈칸 30 / 나머지 20)
-            </button>
+          {/* Top Controls: Presets + AI Toggle */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div className="flex gap-2 overflow-x-auto pb-2 w-full md:w-auto">
+              <button onClick={() => applyPreset('basic')} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-bold text-gray-600 transition-colors whitespace-nowrap">
+                ⚖️ 기본 (AI Off)
+              </button>
+              <button onClick={() => applyPreset('balanced')} className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-full text-xs font-bold text-indigo-600 transition-colors whitespace-nowrap">
+                🎨 골고루 (AI On)
+              </button>
+              <button onClick={() => applyPreset('context_heavy')} className="px-4 py-2 bg-purple-50 hover:bg-purple-100 rounded-full text-xs font-bold text-purple-600 transition-colors whitespace-nowrap">
+                🧠 빈칸 집중 (AI On)
+              </button>
+            </div>
+
+            {/* AI Toggle Switch */}
+            <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+              <span className="text-xs font-bold text-gray-500">AI 문제 생성</span>
+              <button 
+                onClick={() => setUseAi(!useAi)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${useAi ? 'bg-indigo-600' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useAi ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+              <span className={`text-xs font-bold ${useAi ? 'text-indigo-600' : 'text-gray-400'}`}>
+                {useAi ? 'ON (예문/빈칸)' : 'OFF (기본/빠름)'}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
@@ -172,16 +200,23 @@ const TeacherDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-indigo-600 uppercase">3. 빈칸 추론 (1문장)</label>
+              <label className={`text-xs font-bold uppercase flex items-center gap-1 ${useAi ? 'text-indigo-600' : 'text-gray-400'}`}>
+                3. 빈칸 추론 (1문장)
+                {!useAi && <span className="text-[10px] bg-gray-200 text-gray-500 px-1 rounded">AI OFF</span>}
+              </label>
               <div className="relative">
                 <input 
                   type="number" min="0" max="100"
                   value={distribution.context} 
                   onChange={(e) => setDistribution({...distribution, context: Number(e.target.value)})}
-                  className="w-full px-4 py-3 bg-indigo-50 border-2 border-indigo-200 text-indigo-800 rounded-xl focus:border-indigo-500 outline-none font-bold text-lg"
+                  disabled={!useAi}
+                  className={`w-full px-4 py-3 border-2 rounded-xl outline-none font-bold text-lg ${useAi ? 'bg-indigo-50 border-indigo-200 text-indigo-800 focus:border-indigo-500' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-400 text-xs font-bold">문제</span>
+                <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold ${useAi ? 'text-indigo-400' : 'text-gray-400'}`}>문제</span>
               </div>
+              {!useAi && distribution.context > 0 && (
+                <p className="text-[10px] text-red-400 font-bold">* AI가 꺼져있어 자동 분배됩니다.</p>
+              )}
             </div>
 
             <div className="bg-gray-900 text-white p-4 rounded-xl flex flex-col items-center justify-center h-[84px]">

@@ -31,7 +31,7 @@ const getDistractors = (pool: string[], correct: string, count: number = 3): str
 /**
  * Generates a quiz locally using sheet words as distractors.
  * Includes logic to prevent consecutive answer positions.
- * Supports Practice Mode (all words).
+ * Supports Practice Mode (all words) and Fallback Mode (AI failure).
  */
 const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPractice: boolean = false): Question[] => {
   let targetWords: SheetWord[] = [];
@@ -51,11 +51,20 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPr
   const allMeanings = sheetWords.map(sw => sw.meaning);
   const allWords = sheetWords.map(sw => sw.word);
 
-  let currentEK = 0;
-  // Local quiz maps Context -> EngToKor fallback
-  // In practice mode, we just split 50/50 roughly
-  const targetEK = isPractice ? Math.ceil(targetWords.length / 2) : (settings.typeDistribution.engToKor + settings.typeDistribution.context);
+  // Distribute Question Types
+  // If we are falling back from AI failure (Context > 0), we distribute Context items to EK/KE
+  let targetEK = 0;
   
+  if (isPractice) {
+    targetEK = Math.ceil(targetWords.length / 2);
+  } else {
+    const dist = settings.typeDistribution;
+    // Split 'context' items evenly between EngToKor and KorToEng if AI failed or disabled
+    const contextHalf = Math.ceil(dist.context / 2);
+    targetEK = dist.engToKor + contextHalf;
+  }
+
+  let currentEK = targetEK;
   let lastAnswerIndex = -1;
 
   return targetWords.map((sw, idx) => {
@@ -66,7 +75,6 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPr
     // Determine type
     let type: 'engToKor' | 'korToEng' = 'engToKor';
     
-    // Simple distribution logic
     if (currentEK > 0) {
       type = 'engToKor';
       currentEK--;
@@ -119,9 +127,15 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
   }
 
   // FORCE LOCAL GENERATION FOR PRACTICE MODE
-  // AI generation is too slow/expensive for "All Words" (e.g. 200 words)
   if (isPractice) {
     return generateLocalQuiz(sheetWords, settings, true);
+  }
+
+  // EXPLICIT AI DISABLE CHECK OR NO CONTEXT QUESTIONS
+  if (settings.useAi === false || settings.typeDistribution.context === 0) {
+    // If user explicitly disabled AI, we skip calling it and use local generation.
+    // generateLocalQuiz handles re-distributing 'context' counts to other types.
+    return generateLocalQuiz(sheetWords, settings, false);
   }
 
   const dist = settings.typeDistribution;
@@ -227,7 +241,10 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     });
 
   } catch (error: any) {
-    console.warn("Gemini API Error. Falling back to local generation:", error.message);
+    // CRITICAL FIX: Catch quota/billing errors or network issues and fallback gracefully
+    // Instead of showing "Project quota class is not available" to the user,
+    // we silently switch to local generation (Word <-> Meaning).
+    console.warn("Gemini AI generation failed (Quota/Network). Switching to Local Mode:", error.message);
     return generateLocalQuiz(sheetWords, settings, isPractice);
   }
 };

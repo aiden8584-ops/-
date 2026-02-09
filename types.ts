@@ -19,6 +19,7 @@ export interface QuizSettings {
   timeLimitPerQuestion: number; // 0 for no limit
   questionType: QuestionType; // Kept for legacy/display purposes
   typeDistribution: TypeDistribution;
+  useAi?: boolean; // New: Toggle API usage
 }
 
 export interface QuizResult {

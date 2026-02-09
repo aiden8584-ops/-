@@ -45,6 +45,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const cntEK = params.get('c_ek');
     const cntKE = params.get('c_ke');
     const cntCtx = params.get('c_ctx');
+    
+    // New AI Param
+    const paramUseAi = params.get('use_ai');
 
     // 1. Sheet ID Logic
     if (urlSheetId) {
@@ -75,6 +78,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     // 4. Quiz Settings Logic
     let newDistribution: TypeDistribution = { ...APP_CONFIG.defaultSettings.typeDistribution };
     let newTimeLimit = APP_CONFIG.defaultSettings.timeLimitPerQuestion;
+    let newUseAi = APP_CONFIG.defaultSettings.useAi ?? true;
 
     // A. Load from LocalStorage (Persistent Defaults)
     const savedSettingsJSON = localStorage.getItem(SETTINGS_KEY);
@@ -87,6 +91,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         if (saved.typeDistribution) {
           newDistribution = { ...saved.typeDistribution };
         }
+        if (saved.useAi !== undefined) {
+          newUseAi = saved.useAi;
+        }
       } catch (e) {
         console.warn("Failed to parse saved settings", e);
       }
@@ -94,6 +101,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
     // B. URL Params (Override LocalStorage)
     if (urlTLimit) newTimeLimit = Number(urlTLimit);
+    if (paramUseAi !== null) newUseAi = paramUseAi === 'true';
 
     // Granular params override everything
     if (cntEK !== null || cntKE !== null || cntCtx !== null) {
@@ -120,11 +128,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       totalQuestions: totalCalculated,
       timeLimitPerQuestion: newTimeLimit,
       questionType: 'mixed', 
-      typeDistribution: newDistribution
+      typeDistribution: newDistribution,
+      useAi: newUseAi
     });
     
     // Clean URL
-    if (urlSheetId || urlScript || urlClass || cntEK) {
+    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -185,10 +194,15 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                       <span className="text-indigo-300 mx-2">|</span> 
                       {quizSettings.timeLimitPerQuestion ? `${quizSettings.timeLimitPerQuestion}초 제한` : "시간 무제한"}
                     </p>
-                    <div className="flex gap-2 mt-2 text-[10px] font-semibold text-indigo-400">
+                    <div className="flex flex-wrap gap-2 mt-2 text-[10px] font-semibold text-indigo-400">
                       {quizSettings.typeDistribution.engToKor > 0 && <span className="bg-white px-2 py-1 rounded">영한 {quizSettings.typeDistribution.engToKor}</span>}
                       {quizSettings.typeDistribution.korToEng > 0 && <span className="bg-white px-2 py-1 rounded">한영 {quizSettings.typeDistribution.korToEng}</span>}
-                      {quizSettings.typeDistribution.context > 0 && <span className="bg-white px-2 py-1 rounded text-purple-600 border border-purple-100">빈칸 {quizSettings.typeDistribution.context}</span>}
+                      {quizSettings.typeDistribution.context > 0 && (
+                        <span className={`bg-white px-2 py-1 rounded border ${quizSettings.useAi ? 'text-purple-600 border-purple-100' : 'text-gray-400 border-gray-200 line-through'}`}>
+                           빈칸 {quizSettings.typeDistribution.context}
+                        </span>
+                      )}
+                      {!quizSettings.useAi && <span className="bg-gray-200 text-gray-500 px-2 py-1 rounded">AI OFF</span>}
                     </div>
                   </div>
                   <button type="button" onClick={() => setIsUrlInitialized(false)} className="text-xs font-black text-indigo-600 underline">변경</button>

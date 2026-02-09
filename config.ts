@@ -27,6 +27,7 @@ export const APP_CONFIG = {
       engToKor: 25,
       korToEng: 25,
       context: 0
-    }
+    },
+    useAi: true
   }
 };
