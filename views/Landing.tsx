@@ -20,17 +20,22 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   // Custom Settings
   const [quizSettings, setQuizSettings] = useState<QuizSettings>(APP_CONFIG.defaultSettings);
   
-  // Access Control
+  // Access Control & Blocking
   const [requiredAccessCode, setRequiredAccessCode] = useState<string | null>(null);
   const [inputAccessCode, setInputAccessCode] = useState('');
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [accessError, setAccessError] = useState(false);
+
+  // Block Modal State
+  const [blockInfo, setBlockInfo] = useState<{ isOpen: boolean; reason: string; key: string } | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
   
   const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   
   const nameInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
+  const resetInputRef = useRef<HTMLInputElement>(null);
 
   const ACCESS_CODE_KEY = 'vocamaster_required_ac';
 
@@ -197,7 +202,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     if (name.trim() && className.trim() && testDate) {
       
       // -----------------------------------------------------------
-      // 🛡️ RESTART PREVENTION CHECK
+      // 🛡️ RESTART PREVENTION CHECK (Logic Updated to use Modal)
       // -----------------------------------------------------------
       if (mode === 'TEST') {
         const attemptKey = getAttemptKey(testDate, className, name);
@@ -207,11 +212,19 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           try {
             const record = JSON.parse(existingRecord);
             if (record.status === 'COMPLETED') {
-              alert("✅ 이미 제출된 시험입니다.\n\n재시험이 필요한 경우 선생님께 문의하여\n기록 초기화를 요청하세요.");
-              return;
+               setBlockInfo({ 
+                 isOpen: true, 
+                 reason: 'completed', 
+                 key: attemptKey 
+               });
+               return;
             } else if (record.status === 'STARTED' || record.status === 'ABANDONED') {
-              alert("⚠️ [경고] 부정행위 방지 ⚠️\n\n이전에 시험을 중단하거나 포기한 기록이 있습니다.\n'닫기'를 누르거나 창을 닫으면 0점 처리되며 재입장이 불가능합니다.\n\n(선생님께 문의하세요)");
-              return;
+               setBlockInfo({ 
+                 isOpen: true, 
+                 reason: 'abandoned', 
+                 key: attemptKey 
+               });
+               return;
             }
           } catch (e) {
             // Ignore parse errors, proceed to access code check
@@ -242,20 +255,18 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     
     if (inputAccessCode === freshAccessCode) {
       // 🛡️ DOUBLE CHECK BLOCKING (Safety net)
-      // Even if they passed the first check, we check again before actually starting
-      // to prevent race conditions or bypasses via modal.
       const attemptKey = getAttemptKey(testDate, className, name);
       const existing = localStorage.getItem(attemptKey);
       if (existing) {
          try {
            const rec = JSON.parse(existing);
            if (rec.status === 'STARTED' || rec.status === 'ABANDONED') {
-              alert("🚫 시험을 시작할 수 없습니다. (중단된 기록 있음)");
+              setBlockInfo({ isOpen: true, reason: 'abandoned', key: attemptKey });
               setShowAccessModal(false);
               return;
            }
            if (rec.status === 'COMPLETED') {
-              alert("✅ 이미 제출된 시험입니다.");
+              setBlockInfo({ isOpen: true, reason: 'completed', key: attemptKey });
               setShowAccessModal(false);
               return;
            }
@@ -270,17 +281,30 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       setTimeout(() => setAccessError(false), 500);
     }
   };
+
+  const handleAdminReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
+    
+    // Teacher can unlock with the Session Password OR the Master Password 'teacher'
+    if (resetPassword === freshAccessCode || resetPassword === 'teacher') {
+      if (blockInfo?.key) {
+        localStorage.removeItem(blockInfo.key);
+        setBlockInfo(null);
+        setResetPassword('');
+        alert("✅ 기록이 초기화되었습니다.\n다시 시험을 시작할 수 있습니다.");
+      }
+    } else {
+      alert("⛔ 비밀번호가 올바르지 않습니다.");
+      setResetPassword('');
+    }
+  };
   
   const handleResetSettings = () => {
     if (confirm('시험지 설정 및 접속 정보를 초기화하시겠습니까?\n(새로운 QR코드를 스캔해야 합니다)')) {
-      // Clear main settings
       localStorage.removeItem('vocamaster_sheet_id');
       localStorage.removeItem('vocamaster_required_ac');
       localStorage.removeItem('vocamaster_quiz_settings_v2');
-      
-      // OPTIONAL: Clear attempts for the current day to allow reset by user if they really need to?
-      // No, for strictness, we do NOT clear attempts here. Attempts are persistent.
-      
       window.location.reload();
     }
   };
@@ -288,8 +312,54 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pop pb-10">
       
+      {/* 🛡️ BLOCKING MODAL (Restart Prevention) */}
+      {blockInfo && blockInfo.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md animate-pop p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl border-2 border-red-100">
+            <div className="text-center mb-6">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl ${blockInfo.reason === 'completed' ? 'bg-green-100' : 'bg-red-100'}`}>
+                {blockInfo.reason === 'completed' ? '✅' : '🚨'}
+              </div>
+              <h3 className="text-xl font-black text-gray-900">
+                {blockInfo.reason === 'completed' ? '이미 제출된 시험입니다' : '부정행위 방지 차단'}
+              </h3>
+              <p className="text-gray-500 text-sm mt-2 whitespace-pre-line leading-relaxed">
+                {blockInfo.reason === 'completed' 
+                  ? "이미 시험을 완료하고 제출했습니다.\n재시험을 원하시면 선생님께 문의하세요." 
+                  : "시험 도중 화면을 이탈하거나 종료한\n기록이 있어 재입장이 불가능합니다."}
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 text-center">선생님 권한으로 잠금 해제</p>
+              <form onSubmit={handleAdminReset} className="flex gap-2">
+                <input 
+                  ref={resetInputRef}
+                  type="password" 
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="접속코드 or teacher"
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                />
+                <button type="submit" className="bg-gray-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-black transition-colors">
+                  해제
+                </button>
+              </form>
+            </div>
+
+            <button 
+              type="button" 
+              onClick={() => setBlockInfo(null)}
+              className="w-full py-3 text-sm font-bold text-gray-400 hover:text-gray-600 underline"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Access Code Modal */}
-      {showAccessModal && (
+      {showAccessModal && !blockInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-pop p-4">
           <div className={`bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl ${accessError ? 'animate-shake' : ''}`}>
             <div className="text-center mb-6">
