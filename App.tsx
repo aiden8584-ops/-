@@ -52,6 +52,10 @@ function App() {
       const results: QuizResult[] = existing ? JSON.parse(existing) : [];
       results.push(result);
       localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
+      
+      // 🛡️ Mark Attempt as COMPLETED
+      const attemptKey = `vocamaster_attempt_${result.date}_${result.className.trim().replace(/\s+/g, '_')}_${result.studentName.trim().replace(/\s+/g, '_')}`;
+      localStorage.setItem(attemptKey, JSON.stringify({ status: 'COMPLETED', timestamp: Date.now() }));
     }
     
     setLastResult(result);
@@ -103,6 +107,12 @@ function App() {
     setLoadingMessage(`단어 데이터를 불러오는 중...`);
     setIsReviewMode(false);
     
+    // 🛡️ Mark Attempt as STARTED (Prevention of restart)
+    if (mode === 'TEST') {
+      const attemptKey = `vocamaster_attempt_${testDate}_${className.trim().replace(/\s+/g, '_')}_${name.trim().replace(/\s+/g, '_')}`;
+      localStorage.setItem(attemptKey, JSON.stringify({ status: 'STARTED', timestamp: Date.now() }));
+    }
+
     try {
       const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
       if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
@@ -127,6 +137,11 @@ function App() {
       alert(error.message);
       setSession(null);
       setIsLoading(false);
+      // If error occurs during start, remove the attempt flag so they can try again
+      if (mode === 'TEST') {
+        const attemptKey = `vocamaster_attempt_${testDate}_${className.trim().replace(/\s+/g, '_')}_${name.trim().replace(/\s+/g, '_')}`;
+        localStorage.removeItem(attemptKey);
+      }
     }
   };
 

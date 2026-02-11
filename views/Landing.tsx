@@ -189,11 +189,34 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const handleStart = (mode: 'TEST' | 'PRACTICE') => {
     if (name.trim() && className.trim() && testDate) {
-      // FORCE FRESH CHECK: Read directly from localStorage to handle same-device updates immediately
-      // This ensures that if the teacher changed the code in the dashboard (same browser), we catch it here.
+      
+      // -----------------------------------------------------------
+      // 🛡️ RESTART PREVENTION CHECK
+      // -----------------------------------------------------------
+      if (mode === 'TEST') {
+        const attemptKey = `vocamaster_attempt_${testDate}_${className.trim().replace(/\s+/g, '_')}_${name.trim().replace(/\s+/g, '_')}`;
+        const existingRecord = localStorage.getItem(attemptKey);
+        
+        if (existingRecord) {
+          try {
+            const record = JSON.parse(existingRecord);
+            if (record.status === 'COMPLETED') {
+              alert("✅ 이미 제출된 시험입니다.\n\n재시험이 필요한 경우 선생님께 문의하여\n기록 초기화를 요청하세요.");
+              return;
+            } else if (record.status === 'STARTED') {
+              alert("⚠️ [경고] 부정행위 방지 ⚠️\n\n이전에 시험을 중단하거나 비정상적으로 종료한 기록이 있습니다.\n'닫기'를 누르거나 창을 닫으면 0점 처리되며 재입장이 불가능합니다.\n\n(선생님께 문의하세요)");
+              return;
+            }
+          } catch (e) {
+            // Ignore parse errors, proceed to access code check
+          }
+        }
+      }
+      // -----------------------------------------------------------
+
+      // FORCE FRESH CHECK: Read directly from localStorage
       const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
       
-      // Update state if stale
       if (freshAccessCode !== requiredAccessCode) {
         setRequiredAccessCode(freshAccessCode);
       }
@@ -209,7 +232,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const verifyAccessCode = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    // Double check storage one last time
     const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
     
     if (inputAccessCode === freshAccessCode) {
@@ -218,15 +240,20 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     } else {
       setAccessError(true);
       setInputAccessCode('');
-      setTimeout(() => setAccessError(false), 500); // Reset shake
+      setTimeout(() => setAccessError(false), 500);
     }
   };
   
   const handleResetSettings = () => {
     if (confirm('시험지 설정 및 접속 정보를 초기화하시겠습니까?\n(새로운 QR코드를 스캔해야 합니다)')) {
+      // Clear main settings
       localStorage.removeItem('vocamaster_sheet_id');
       localStorage.removeItem('vocamaster_required_ac');
       localStorage.removeItem('vocamaster_quiz_settings_v2');
+      
+      // OPTIONAL: Clear attempts for the current day to allow reset by user if they really need to?
+      // No, for strictness, we do NOT clear attempts here. Attempts are persistent.
+      
       window.location.reload();
     }
   };
@@ -252,7 +279,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
             <form onSubmit={verifyAccessCode} className="space-y-4">
               <input
                 ref={codeInputRef}
-                type="text" // numeric only? usually string is safer
+                type="text" 
                 pattern="[0-9]*"
                 inputMode="numeric"
                 value={inputAccessCode}
