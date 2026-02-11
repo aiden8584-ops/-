@@ -32,11 +32,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const codeInputRef = useRef<HTMLInputElement>(null);
 
+  const ACCESS_CODE_KEY = 'vocamaster_required_ac';
+
   useEffect(() => {
     const SHEET_KEY = 'vocamaster_sheet_id';
     const SCRIPT_KEY = 'vocamaster_script_url';
     const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
-    const ACCESS_CODE_KEY = 'vocamaster_required_ac';
     
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet_id');
@@ -165,6 +166,16 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi || ac) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // Listen for storage changes (Same device sync)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACCESS_CODE_KEY) {
+        setRequiredAccessCode(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+
   }, []);
 
   const loadTabs = async (id: string) => {
@@ -178,7 +189,16 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const handleStart = (mode: 'TEST' | 'PRACTICE') => {
     if (name.trim() && className.trim() && testDate) {
-      if (mode === 'TEST' && requiredAccessCode) {
+      // FORCE FRESH CHECK: Read directly from localStorage to handle same-device updates immediately
+      // This ensures that if the teacher changed the code in the dashboard (same browser), we catch it here.
+      const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
+      
+      // Update state if stale
+      if (freshAccessCode !== requiredAccessCode) {
+        setRequiredAccessCode(freshAccessCode);
+      }
+
+      if (mode === 'TEST' && freshAccessCode) {
         setShowAccessModal(true);
         setTimeout(() => codeInputRef.current?.focus(), 100);
       } else {
@@ -189,13 +209,25 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const verifyAccessCode = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (inputAccessCode === requiredAccessCode) {
+    // Double check storage one last time
+    const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
+    
+    if (inputAccessCode === freshAccessCode) {
       setShowAccessModal(false);
       onStart(name.trim(), className.trim(), testDate, quizSettings, 'TEST');
     } else {
       setAccessError(true);
       setInputAccessCode('');
       setTimeout(() => setAccessError(false), 500); // Reset shake
+    }
+  };
+  
+  const handleResetSettings = () => {
+    if (confirm('시험지 설정 및 접속 정보를 초기화하시겠습니까?\n(새로운 QR코드를 스캔해야 합니다)')) {
+      localStorage.removeItem('vocamaster_sheet_id');
+      localStorage.removeItem('vocamaster_required_ac');
+      localStorage.removeItem('vocamaster_quiz_settings_v2');
+      window.location.reload();
     }
   };
 
@@ -245,7 +277,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         </div>
       )}
 
-      <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-indigo-50">
+      <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-indigo-50 relative">
         <div className="bg-indigo-600 p-10 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
           <h2 className="text-3xl font-black text-white mb-2 relative z-10 tracking-tight">PIF영어학원 단어시험</h2>
@@ -333,6 +365,18 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
             </>
           )}
         </form>
+
+        {/* Setting Reset Button */}
+        {hasSheetId && (
+          <div className="bg-gray-50 p-4 border-t border-gray-100 text-center">
+            <button 
+              onClick={handleResetSettings}
+              className="text-[10px] text-gray-400 underline font-medium hover:text-gray-600"
+            >
+              설정 초기화 (새로운 QR 스캔 필요)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
