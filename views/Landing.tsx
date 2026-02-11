@@ -20,10 +20,17 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   // Custom Settings
   const [quizSettings, setQuizSettings] = useState<QuizSettings>(APP_CONFIG.defaultSettings);
   
+  // Access Control
+  const [requiredAccessCode, setRequiredAccessCode] = useState<string | null>(null);
+  const [inputAccessCode, setInputAccessCode] = useState('');
+  const [showAccessModal, setShowAccessModal] = useState(false);
+  const [accessError, setAccessError] = useState(false);
+  
   const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const SHEET_KEY = 'vocamaster_sheet_id';
@@ -48,6 +55,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     
     // New AI Param
     const paramUseAi = params.get('use_ai');
+    
+    // Access Code
+    const ac = params.get('ac');
 
     // 1. Sheet ID Logic
     if (urlSheetId) {
@@ -73,6 +83,11 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       setClassName(urlClass);
       setIsUrlInitialized(true);
       setTimeout(() => nameInputRef.current?.focus(), 500);
+    }
+    
+    // 3.5 Access Code Logic
+    if (ac) {
+      setRequiredAccessCode(ac.trim());
     }
 
     // 4. Quiz Settings Logic
@@ -132,8 +147,8 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       useAi: newUseAi
     });
     
-    // Clean URL
-    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi) {
+    // Clean URL (but keep access code in state)
+    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi || ac) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
@@ -149,12 +164,73 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const handleStart = (mode: 'TEST' | 'PRACTICE') => {
     if (name.trim() && className.trim() && testDate) {
-      onStart(name.trim(), className.trim(), testDate, quizSettings, mode);
+      if (mode === 'TEST' && requiredAccessCode) {
+        setShowAccessModal(true);
+        setTimeout(() => codeInputRef.current?.focus(), 100);
+      } else {
+        onStart(name.trim(), className.trim(), testDate, quizSettings, mode);
+      }
+    }
+  };
+
+  const verifyAccessCode = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (inputAccessCode === requiredAccessCode) {
+      setShowAccessModal(false);
+      onStart(name.trim(), className.trim(), testDate, quizSettings, 'TEST');
+    } else {
+      setAccessError(true);
+      setInputAccessCode('');
+      setTimeout(() => setAccessError(false), 500); // Reset shake
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pop pb-10">
+      
+      {/* Access Code Modal */}
+      {showAccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-pop p-4">
+          <div className={`bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl ${accessError ? 'animate-shake' : ''}`}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🔒
+              </div>
+              <h3 className="text-xl font-black text-gray-900">선생님 확인 대기</h3>
+              <p className="text-gray-500 text-sm mt-2">
+                선생님이 알려주시는<br/>
+                <span className="text-indigo-600 font-bold">접속 코드(비밀번호)</span>를 입력해주세요.
+              </p>
+            </div>
+            
+            <form onSubmit={verifyAccessCode} className="space-y-4">
+              <input
+                ref={codeInputRef}
+                type="text" // numeric only? usually string is safer
+                pattern="[0-9]*"
+                inputMode="numeric"
+                value={inputAccessCode}
+                onChange={(e) => setInputAccessCode(e.target.value)}
+                className="w-full text-center text-3xl font-black tracking-widest py-4 border-b-2 border-gray-200 focus:border-indigo-600 outline-none transition-colors placeholder-gray-200"
+                placeholder="0000"
+                maxLength={8}
+                autoComplete="off"
+              />
+              <Button type="submit" fullWidth size="lg" className="rounded-xl shadow-lg shadow-indigo-200">
+                시험 시작 확인
+              </Button>
+              <button 
+                type="button" 
+                onClick={() => setShowAccessModal(false)}
+                className="w-full py-3 text-sm font-bold text-gray-400 hover:text-gray-600"
+              >
+                취소
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-indigo-50">
         <div className="bg-indigo-600 p-10 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
@@ -220,9 +296,14 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                   type="button" 
                   onClick={() => handleStart('TEST')}
                   disabled={!className || !name || !testDate} 
-                  className="text-xl py-6 shadow-2xl rounded-[1.5rem] font-black"
+                  className="text-xl py-6 shadow-2xl rounded-[1.5rem] font-black relative overflow-hidden group"
                 >
-                  시험 시작하기
+                  <span className="relative z-10">시험 시작하기</span>
+                  {requiredAccessCode && (
+                    <div className="absolute top-2 right-3 z-10 text-[10px] bg-black/20 px-2 py-0.5 rounded-full text-white font-bold flex items-center gap-1">
+                       🔒 잠금
+                    </div>
+                  )}
                 </Button>
                 
                 <Button 

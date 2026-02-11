@@ -10,7 +10,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
 
-const APP_VERSION = "v1.30 (AI Toggle Support)";
+const APP_VERSION = "v1.40 (Access Code)";
 
 const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
 
@@ -23,6 +23,9 @@ const TeacherDashboard: React.FC = () => {
   const [timeLimit, setTimeLimit] = useState(APP_CONFIG.defaultSettings.timeLimitPerQuestion);
   const [distribution, setDistribution] = useState<TypeDistribution>(APP_CONFIG.defaultSettings.typeDistribution);
   const [useAi, setUseAi] = useState<boolean>(APP_CONFIG.defaultSettings.useAi ?? true);
+  
+  // Access Control
+  const [accessCode, setAccessCode] = useState('1234'); // Default Code
 
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   const [selectedClass, setSelectedClass] = useState('');
@@ -99,9 +102,12 @@ const TeacherDashboard: React.FC = () => {
     params.set('c_ctx', distribution.context.toString());
     
     params.set('t_limit', timeLimit.toString());
-    
-    // New param for AI toggle
     params.set('use_ai', useAi.toString());
+    
+    // Pass the access code in URL (simple security)
+    if (accessCode.trim()) {
+      params.set('ac', accessCode.trim());
+    }
 
     params.set('date', new Date().toISOString().split('T')[0]);
     
@@ -110,7 +116,7 @@ const TeacherDashboard: React.FC = () => {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     
     return `${url}/?${params.toString()}`;
-  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit, useAi]);
+  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit, useAi, accessCode]);
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
 
@@ -238,6 +244,20 @@ const TeacherDashboard: React.FC = () => {
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">초</span>
                 </div>
+              </div>
+             <div className="space-y-2">
+                <label className="text-sm font-bold text-indigo-600">🔐 시험 접속 코드 (비밀번호)</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={accessCode} 
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    className="w-full px-4 py-3 bg-indigo-50 border-2 border-indigo-100 rounded-xl focus:border-indigo-500 outline-none font-bold text-indigo-800"
+                    placeholder="예: 1234"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-400 text-xs font-bold">학생 입력 필수</span>
+                </div>
+                <p className="text-[10px] text-gray-400">학생들은 시험 시작 시 이 코드를 입력해야 합니다. (비워두면 누구나 접속)</p>
               </div>
           </div>
         </div>
