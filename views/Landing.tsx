@@ -336,7 +336,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                   type="password" 
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
-                  placeholder="관리자 암호 (teacher)"
+                  placeholder="관리자 암호 입력"
                   className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
                 />
                 <button type="submit" className="bg-gray-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-black transition-colors">
