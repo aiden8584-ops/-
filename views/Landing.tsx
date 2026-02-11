@@ -36,6 +36,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const SHEET_KEY = 'vocamaster_sheet_id';
     const SCRIPT_KEY = 'vocamaster_script_url';
     const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
+    const ACCESS_CODE_KEY = 'vocamaster_required_ac';
     
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet_id');
@@ -85,9 +86,22 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       setTimeout(() => nameInputRef.current?.focus(), 500);
     }
     
-    // 3.5 Access Code Logic
+    // 3.5 Access Code Logic (Improved persistence)
     if (ac) {
-      setRequiredAccessCode(ac.trim());
+      // Case 1: Explicit Access Code in URL -> Save and Enforce
+      const code = ac.trim();
+      localStorage.setItem(ACCESS_CODE_KEY, code);
+      setRequiredAccessCode(code);
+    } else if (urlSheetId) {
+      // Case 2: New Sheet Link BUT No Access Code -> Clear previous restriction (Open access)
+      localStorage.removeItem(ACCESS_CODE_KEY);
+      setRequiredAccessCode(null);
+    } else {
+      // Case 3: No URL params (Reload or Back from Quiz) -> Restore from Storage
+      const storedAc = localStorage.getItem(ACCESS_CODE_KEY);
+      if (storedAc) {
+        setRequiredAccessCode(storedAc);
+      }
     }
 
     // 4. Quiz Settings Logic
@@ -147,7 +161,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       useAi: newUseAi
     });
     
-    // Clean URL (but keep access code in state)
+    // Clean URL (but keep access code in state/storage)
     if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi || ac) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
