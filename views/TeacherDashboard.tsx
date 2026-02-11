@@ -9,8 +9,9 @@ const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
+const ACCESS_CODE_KEY = 'vocamaster_required_ac';
 
-const APP_VERSION = "v1.41 (Preset Update)";
+const APP_VERSION = "v1.42 (Instant Code Sync)";
 
 const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
 
@@ -24,8 +25,8 @@ const TeacherDashboard: React.FC = () => {
   const [distribution, setDistribution] = useState<TypeDistribution>(APP_CONFIG.defaultSettings.typeDistribution);
   const [useAi, setUseAi] = useState<boolean>(APP_CONFIG.defaultSettings.useAi ?? true);
   
-  // Access Control
-  const [accessCode, setAccessCode] = useState('1234'); // Default Code
+  // Access Control - Initialize from storage to ensure continuity
+  const [accessCode, setAccessCode] = useState(() => localStorage.getItem(ACCESS_CODE_KEY) || '1234');
 
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   const [selectedClass, setSelectedClass] = useState('');
@@ -64,6 +65,15 @@ const TeacherDashboard: React.FC = () => {
       useAi: useAi
     }));
   }, [timeLimit, distribution, useAi]);
+
+  // Update localStorage whenever Access Code changes
+  useEffect(() => {
+    if (accessCode.trim()) {
+      localStorage.setItem(ACCESS_CODE_KEY, accessCode.trim());
+    } else {
+      localStorage.removeItem(ACCESS_CODE_KEY);
+    }
+  }, [accessCode]);
 
   const loadTabs = async (id: string) => {
     if (!id) return;
