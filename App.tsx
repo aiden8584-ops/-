@@ -160,7 +160,12 @@ function App() {
     setCurrentView(AppView.RESULT);
   };
 
-  const handleLogout = () => { 
+  const handleSafeExit = () => {
+    if (currentView === AppView.QUIZ && session?.mode === 'TEST') {
+      if (!window.confirm("⚠️ 시험이 진행 중입니다!\n\n화면을 벗어나면 시험이 종료되고 기록되지 않습니다.\n정말 그만두시겠습니까?")) {
+        return;
+      }
+    }
     setSession(null); 
     setQuestions([]); 
     setLastResult(null); 
@@ -175,7 +180,7 @@ function App() {
       case AppView.QUIZ:
         return session && <Quiz questions={questions} settings={session.settings} onComplete={handleQuizComplete} />;
       case AppView.RESULT:
-        return lastResult && <Result result={lastResult} onHome={handleLogout} submissionStatus={submissionStatus} />;
+        return lastResult && <Result result={lastResult} onHome={handleSafeExit} submissionStatus={submissionStatus} />;
       case AppView.TEACHER_LOGIN:
         return (
           <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-pop text-center">
@@ -187,7 +192,7 @@ function App() {
       case AppView.TEACHER_DASHBOARD:
         return <TeacherDashboard />;
       case AppView.PRACTICE_SELECT:
-        return <PracticeSelect totalWords={rawPracticeWords} onSelectSet={handlePracticeSetSelect} onBack={handleLogout} />;
+        return <PracticeSelect totalWords={rawPracticeWords} onSelectSet={handlePracticeSetSelect} onBack={handleSafeExit} />;
       case AppView.FLASHCARD:
         return <FlashcardStudy words={activePracticeSet} setTitle={activeSetTitle} onFinish={() => setCurrentView(AppView.PRACTICE_SELECT)} />;
       default:
@@ -199,7 +204,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView(AppView.LANDING)}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={handleSafeExit}>
             <div className="bg-indigo-600 text-white p-2 rounded-lg">
                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
             </div>
@@ -212,7 +217,7 @@ function App() {
             <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium">선생님</button>
           )}
           {(currentView !== AppView.LANDING) && (
-            <button onClick={handleLogout} className="text-sm text-gray-500 font-medium">닫기</button>
+            <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium">닫기</button>
           )}
         </div>
       </header>

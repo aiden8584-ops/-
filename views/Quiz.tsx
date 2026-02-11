@@ -24,6 +24,31 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
   
   const [wrongQuestions, setWrongQuestions] = useState<Question[]>([]);
 
+  // Prevent accidental close/refresh/back
+  useEffect(() => {
+    // 1. Browser Refresh / Close Tab Protection
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ''; // Chrome requires this to be set
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // 2. Browser Back Button Protection
+    // Push a dummy state so back button hits this first
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = (e: PopStateEvent) => {
+      // Repush state to keep them here
+      window.history.pushState(null, '', window.location.href);
+      alert("⚠️ 시험 중에는 뒤로가기를 사용할 수 없습니다.");
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   // Overall test timer
   useEffect(() => {
     const timer = setInterval(() => {
