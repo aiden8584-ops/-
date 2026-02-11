@@ -284,10 +284,8 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const handleAdminReset = (e: React.FormEvent) => {
     e.preventDefault();
-    const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
-    
-    // Teacher can unlock with the Session Password OR the Master Password 'teacher'
-    if (resetPassword === freshAccessCode || resetPassword === 'teacher') {
+    // Only allow the Master Password 'teacher'
+    if (resetPassword === 'teacher') {
       if (blockInfo?.key) {
         localStorage.removeItem(blockInfo.key);
         setBlockInfo(null);
@@ -295,7 +293,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         alert("✅ 기록이 초기화되었습니다.\n다시 시험을 시작할 수 있습니다.");
       }
     } else {
-      alert("⛔ 비밀번호가 올바르지 않습니다.");
+      alert("⛔ 관리자 비밀번호가 올바르지 않습니다.");
       setResetPassword('');
     }
   };
@@ -338,7 +336,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                   type="password" 
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
-                  placeholder="접속코드 or teacher"
+                  placeholder="관리자 암호 (teacher)"
                   className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
                 />
                 <button type="submit" className="bg-gray-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-black transition-colors">
