@@ -162,7 +162,7 @@ function App() {
 
   const handleSafeExit = () => {
     if (currentView === AppView.QUIZ && session?.mode === 'TEST') {
-      if (!window.confirm("⚠️ 시험이 진행 중입니다!\n\n화면을 벗어나면 시험이 종료되고 기록되지 않습니다.\n정말 그만두시겠습니까?")) {
+      if (!window.confirm("⚠️ 경고: 시험 진행 중입니다! ⚠️\n\n지금 나가면 '0점' 처리될 수 있으며, 재시험이 불가능할 수 있습니다.\n\n정말 시험을 포기하고 종료하시겠습니까?")) {
         return;
       }
     }

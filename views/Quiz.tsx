@@ -24,28 +24,35 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
   
   const [wrongQuestions, setWrongQuestions] = useState<Question[]>([]);
 
-  // Prevent accidental close/refresh/back
+  // -------------------------------------------------------------------------
+  // 🛡️ STRICT NAVIGATION GUARD (Prevent Back/Refresh/Close)
+  // -------------------------------------------------------------------------
   useEffect(() => {
-    // 1. Browser Refresh / Close Tab Protection
+    // 1. Disable Back Button (Push Dummy State)
+    // We push a state immediately so "Back" pops this state instead of leaving.
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = (e: PopStateEvent) => {
+      // Prevent navigation by pushing state again immediately
+      window.history.pushState(null, '', window.location.href);
+      // Show aggressive warning
+      alert("🚫 [경고] 시험 중에는 뒤로가기가 금지되어 있습니다.\n계속 시도하면 불이익이 있을 수 있습니다.");
+    };
+
+    // 2. Prevent Tab Close / Refresh
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = ''; // Chrome requires this to be set
+      // Required for Chrome to show the browser's native confirmation dialog
+      e.returnValue = ''; 
+      return '';
     };
+
+    window.addEventListener('popstate', handlePopState);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // 2. Browser Back Button Protection
-    // Push a dummy state so back button hits this first
-    window.history.pushState(null, '', window.location.href);
-    const handlePopState = (e: PopStateEvent) => {
-      // Repush state to keep them here
-      window.history.pushState(null, '', window.location.href);
-      alert("⚠️ 시험 중에는 뒤로가기를 사용할 수 없습니다.");
-    };
-    window.addEventListener('popstate', handlePopState);
-
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 
@@ -134,11 +141,10 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
 
   const progress = ((currentIndex + 1) / questions.length) * 100;
   
-  // Check if the question text is long (likely a sentence/paragraph)
   const isLongText = currentQuestion.word.length > 40;
 
   return (
-    <div className="max-w-2xl mx-auto animate-pop">
+    <div className="max-w-2xl mx-auto animate-pop select-none">
       <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <div className="flex flex-col">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Progress</span>
