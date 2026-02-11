@@ -10,7 +10,7 @@ const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
 const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
 
-const APP_VERSION = "v1.40 (Access Code)";
+const APP_VERSION = "v1.41 (Preset Update)";
 
 const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
 
@@ -122,13 +122,13 @@ const TeacherDashboard: React.FC = () => {
 
   const applyPreset = (type: 'balanced' | 'basic' | 'context_heavy') => {
     if (type === 'balanced') {
-      setDistribution({ engToKor: 15, korToEng: 15, context: 20 });
+      setDistribution({ engToKor: 20, korToEng: 20, context: 10 });
       setUseAi(true);
     } else if (type === 'basic') {
       setDistribution({ engToKor: 25, korToEng: 25, context: 0 });
       setUseAi(false); // Basic often doesn't need AI
     } else if (type === 'context_heavy') {
-      setDistribution({ engToKor: 10, korToEng: 10, context: 30 });
+      setDistribution({ engToKor: 15, korToEng: 15, context: 20 });
       setUseAi(true);
     }
   };
