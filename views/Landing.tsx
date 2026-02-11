@@ -187,6 +187,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     }
   };
 
+  // Helper for consistent key generation
+  const getAttemptKey = (d: string, c: string, n: string) => {
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '_');
+    return `vocamaster_attempt_${d}_${norm(c)}_${norm(n)}`;
+  };
+
   const handleStart = (mode: 'TEST' | 'PRACTICE') => {
     if (name.trim() && className.trim() && testDate) {
       
@@ -194,7 +200,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       // 🛡️ RESTART PREVENTION CHECK
       // -----------------------------------------------------------
       if (mode === 'TEST') {
-        const attemptKey = `vocamaster_attempt_${testDate}_${className.trim().replace(/\s+/g, '_')}_${name.trim().replace(/\s+/g, '_')}`;
+        const attemptKey = getAttemptKey(testDate, className, name);
         const existingRecord = localStorage.getItem(attemptKey);
         
         if (existingRecord) {
@@ -203,8 +209,8 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
             if (record.status === 'COMPLETED') {
               alert("✅ 이미 제출된 시험입니다.\n\n재시험이 필요한 경우 선생님께 문의하여\n기록 초기화를 요청하세요.");
               return;
-            } else if (record.status === 'STARTED') {
-              alert("⚠️ [경고] 부정행위 방지 ⚠️\n\n이전에 시험을 중단하거나 비정상적으로 종료한 기록이 있습니다.\n'닫기'를 누르거나 창을 닫으면 0점 처리되며 재입장이 불가능합니다.\n\n(선생님께 문의하세요)");
+            } else if (record.status === 'STARTED' || record.status === 'ABANDONED') {
+              alert("⚠️ [경고] 부정행위 방지 ⚠️\n\n이전에 시험을 중단하거나 포기한 기록이 있습니다.\n'닫기'를 누르거나 창을 닫으면 0점 처리되며 재입장이 불가능합니다.\n\n(선생님께 문의하세요)");
               return;
             }
           } catch (e) {
@@ -235,6 +241,27 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
     
     if (inputAccessCode === freshAccessCode) {
+      // 🛡️ DOUBLE CHECK BLOCKING (Safety net)
+      // Even if they passed the first check, we check again before actually starting
+      // to prevent race conditions or bypasses via modal.
+      const attemptKey = getAttemptKey(testDate, className, name);
+      const existing = localStorage.getItem(attemptKey);
+      if (existing) {
+         try {
+           const rec = JSON.parse(existing);
+           if (rec.status === 'STARTED' || rec.status === 'ABANDONED') {
+              alert("🚫 시험을 시작할 수 없습니다. (중단된 기록 있음)");
+              setShowAccessModal(false);
+              return;
+           }
+           if (rec.status === 'COMPLETED') {
+              alert("✅ 이미 제출된 시험입니다.");
+              setShowAccessModal(false);
+              return;
+           }
+         } catch(e){}
+      }
+
       setShowAccessModal(false);
       onStart(name.trim(), className.trim(), testDate, quizSettings, 'TEST');
     } else {

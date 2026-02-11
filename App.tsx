@@ -17,6 +17,12 @@ const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 
+// Helper for consistent key generation
+const getAttemptKey = (date: string, className: string, name: string) => {
+  const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '_');
+  return `vocamaster_attempt_${date}_${normalize(className)}_${normalize(name)}`;
+};
+
 function App() {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
   const [session, setSession] = useState<UserSession | null>(null);
@@ -54,7 +60,7 @@ function App() {
       localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
       
       // 🛡️ Mark Attempt as COMPLETED
-      const attemptKey = `vocamaster_attempt_${result.date}_${result.className.trim().replace(/\s+/g, '_')}_${result.studentName.trim().replace(/\s+/g, '_')}`;
+      const attemptKey = getAttemptKey(result.date, result.className, result.studentName);
       localStorage.setItem(attemptKey, JSON.stringify({ status: 'COMPLETED', timestamp: Date.now() }));
     }
     
@@ -108,8 +114,10 @@ function App() {
     setIsReviewMode(false);
     
     // 🛡️ Mark Attempt as STARTED (Prevention of restart)
+    // Using normalized key to prevent case-sensitivity exploits
+    let attemptKey = '';
     if (mode === 'TEST') {
-      const attemptKey = `vocamaster_attempt_${testDate}_${className.trim().replace(/\s+/g, '_')}_${name.trim().replace(/\s+/g, '_')}`;
+      attemptKey = getAttemptKey(testDate, className, name);
       localStorage.setItem(attemptKey, JSON.stringify({ status: 'STARTED', timestamp: Date.now() }));
     }
 
@@ -117,16 +125,13 @@ function App() {
       const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
       if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
       
-      // Updated: Pass mode to fetchWordsFromSheet to select correct columns (A/B or D/E)
       const sheetWords = await fetchWordsFromSheet(sheetId, className, mode);
       
       if (mode === 'PRACTICE') {
-        // PRACTICE MODE: Store raw words and go to selection screen
         setRawPracticeWords(sheetWords);
         setIsLoading(false);
         setCurrentView(AppView.PRACTICE_SELECT);
       } else {
-        // TEST MODE: Generate Questions
         setLoadingMessage('시험지를 생성 중입니다...');
         const generatedQuestions = await generateQuizQuestions(settings, sheetWords, false);
         setQuestions(generatedQuestions);
@@ -137,9 +142,8 @@ function App() {
       alert(error.message);
       setSession(null);
       setIsLoading(false);
-      // If error occurs during start, remove the attempt flag so they can try again
-      if (mode === 'TEST') {
-        const attemptKey = `vocamaster_attempt_${testDate}_${className.trim().replace(/\s+/g, '_')}_${name.trim().replace(/\s+/g, '_')}`;
+      // If error occurs during start (e.g. network), remove the attempt flag so they can try again
+      if (mode === 'TEST' && attemptKey) {
         localStorage.removeItem(attemptKey);
       }
     }
@@ -180,6 +184,11 @@ function App() {
       if (!window.confirm("⚠️ 경고: 시험 진행 중입니다! ⚠️\n\n지금 나가면 '0점' 처리될 수 있으며, 재시험이 불가능할 수 있습니다.\n\n정말 시험을 포기하고 종료하시겠습니까?")) {
         return;
       }
+      
+      // 🛡️ Mark Attempt as ABANDONED explicitly
+      // This prevents them from coming back and saying "it crashed" to retry.
+      const attemptKey = getAttemptKey(session.testDate, session.className, session.name);
+      localStorage.setItem(attemptKey, JSON.stringify({ status: 'ABANDONED', timestamp: Date.now() }));
     }
     setSession(null); 
     setQuestions([]); 
