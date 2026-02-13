@@ -16,7 +16,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
   const [isAnswered, setIsAnswered] = useState(false);
   const [startTime] = useState(Date.now());
   const [currentTime, setCurrentTime] = useState(0);
-  const [shake, setShake] = useState(false);
+  // Removed shake state as visual feedback for wrong answers is disabled
   
   // Per-question timer
   const [timeLeft, setTimeLeft] = useState(settings.timeLimitPerQuestion);
@@ -120,19 +120,14 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
 
     const isCorrect = optionIndex === currentQuestion.correctAnswerIndex;
 
+    // Silent Scoring (No visual/audio feedback during test)
     if (isCorrect) {
-      playSound('correct');
       setScore(prev => prev + 1);
     } else {
-      playSound('incorrect');
-      if (navigator.vibrate) {
-        navigator.vibrate(200); 
-      }
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
       setWrongQuestions(prev => [...prev, currentQuestion]);
     }
 
+    // Move to next question faster since there is no feedback to read
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
         setCurrentIndex(prev => prev + 1);
@@ -143,14 +138,19 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
         const finalTime = Math.floor((Date.now() - startTime) / 1000);
         onComplete(isCorrect ? score + 1 : score, questions.length, finalTime, isCorrect ? wrongQuestions : [...wrongQuestions, currentQuestion]);
       }
-    }, 1500);
+    }, 600); // 600ms delay for visual confirmation of selection
   };
 
   const getButtonClass = (index: number) => {
     if (!isAnswered) return "bg-white hover:bg-gray-50 border-gray-200 text-gray-700";
-    if (index === currentQuestion.correctAnswerIndex) return "bg-green-100 border-green-500 text-green-800 ring-1 ring-green-500 font-semibold";
-    if (index === selectedOption) return "bg-red-100 border-red-500 text-red-800 ring-1 ring-red-500";
-    return "bg-gray-50 border-gray-200 text-gray-400 opacity-60";
+    
+    // Feedback Hidden Mode: Only highlight selected option neutrally
+    if (index === selectedOption) {
+      return "bg-indigo-600 border-indigo-600 text-white font-bold shadow-md transform scale-[1.02] ring-0";
+    }
+    
+    // Other options fade out slightly
+    return "bg-gray-50 border-gray-100 text-gray-400 opacity-50";
   };
 
   const formatTime = (seconds: number) => {
@@ -190,7 +190,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
         <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
       </div>
 
-      <div className={`bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-transform duration-200 ${shake ? 'animate-shake' : ''}`}>
+      <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-transform duration-200">
         <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 p-8 md:p-10 flex flex-col justify-center min-h-[160px]">
           <h2 
             className={`font-bold text-white tracking-tight leading-snug break-keep ${
