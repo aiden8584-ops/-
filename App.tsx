@@ -52,21 +52,18 @@ function App() {
   }, []);
 
   const saveResult = (result: QuizResult) => {
-    // Only save to local storage and google sheet if it is TEST mode
     if (result.mode === 'TEST') {
       const existing = localStorage.getItem(RESULT_STORAGE_KEY);
       const results: QuizResult[] = existing ? JSON.parse(existing) : [];
       results.push(result);
       localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(results));
       
-      // 🛡️ Mark Attempt as COMPLETED
       const attemptKey = getAttemptKey(result.date, result.className, result.studentName);
       localStorage.setItem(attemptKey, JSON.stringify({ status: 'COMPLETED', timestamp: Date.now() }));
     }
     
     setLastResult(result);
 
-    // Submission logic
     if (result.mode === 'TEST') {
       const scriptUrl = localStorage.getItem(SCRIPT_URL_KEY) || APP_CONFIG.scriptUrl;
       if (scriptUrl) {
@@ -113,8 +110,6 @@ function App() {
     setLoadingMessage(`단어 데이터를 불러오는 중...`);
     setIsReviewMode(false);
     
-    // 🛡️ Mark Attempt as STARTED (Prevention of restart)
-    // Using normalized key to prevent case-sensitivity exploits
     let attemptKey = '';
     if (mode === 'TEST') {
       attemptKey = getAttemptKey(testDate, className, name);
@@ -142,7 +137,6 @@ function App() {
       alert(error.message);
       setSession(null);
       setIsLoading(false);
-      // If error occurs during start (e.g. network), remove the attempt flag so they can try again
       if (mode === 'TEST' && attemptKey) {
         localStorage.removeItem(attemptKey);
       }
@@ -181,12 +175,11 @@ function App() {
 
   const handleSafeExit = () => {
     if (currentView === AppView.QUIZ && session?.mode === 'TEST') {
+      // During TEST mode in QUIZ view, we strictly block exit via the app logic.
+      // But we have this as a backup if UI elements are clicked.
       if (!window.confirm("⚠️ 경고: 시험 진행 중입니다! ⚠️\n\n지금 나가면 '0점' 처리될 수 있으며, 재시험이 불가능할 수 있습니다.\n\n정말 시험을 포기하고 종료하시겠습니까?")) {
         return;
       }
-      
-      // 🛡️ Mark Attempt as ABANDONED explicitly
-      // This prevents them from coming back and saying "it crashed" to retry.
       const attemptKey = getAttemptKey(session.testDate, session.className, session.name);
       localStorage.setItem(attemptKey, JSON.stringify({ status: 'ABANDONED', timestamp: Date.now() }));
     }
@@ -224,11 +217,19 @@ function App() {
     }
   };
 
+  const isTestInQuiz = currentView === AppView.QUIZ && session?.mode === 'TEST';
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={handleSafeExit}>
+          <div 
+            className={`flex items-center gap-2 ${isTestInQuiz ? 'cursor-default' : 'cursor-pointer'}`} 
+            onClick={() => {
+              if (isTestInQuiz) return;
+              handleSafeExit();
+            }}
+          >
             <div className="bg-indigo-600 text-white p-2 rounded-lg">
                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
             </div>
@@ -236,12 +237,20 @@ function App() {
             {session?.mode === 'PRACTICE' && (
               <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold ml-2">연습모드</span>
             )}
+            {session?.mode === 'TEST' && currentView === AppView.QUIZ && (
+              <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold ml-2">시험 진행중 (차단됨)</span>
+            )}
           </div>
-          {currentView === AppView.LANDING && (
-            <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium">선생님</button>
-          )}
-          {(currentView !== AppView.LANDING) && (
-            <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium">닫기</button>
+          
+          {!isTestInQuiz && (
+            <div className="flex items-center gap-4">
+              {currentView === AppView.LANDING && (
+                <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium">선생님</button>
+              )}
+              {currentView !== AppView.LANDING && (
+                <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium">닫기</button>
+              )}
+            </div>
           )}
         </div>
       </header>

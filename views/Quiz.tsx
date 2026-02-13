@@ -29,30 +29,51 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
   // -------------------------------------------------------------------------
   useEffect(() => {
     // 1. Disable Back Button (Push Dummy State)
-    // We push a state immediately so "Back" pops this state instead of leaving.
     window.history.pushState(null, '', window.location.href);
 
     const handlePopState = (e: PopStateEvent) => {
-      // Prevent navigation by pushing state again immediately
       window.history.pushState(null, '', window.location.href);
-      // Show aggressive warning
-      alert("🚫 [경고] 시험 중에는 뒤로가기가 금지되어 있습니다.\n계속 시도하면 불이익이 있을 수 있습니다.");
+      alert("🚫 [경고] 시험 중에는 뒤로가기가 금지되어 있습니다.");
     };
 
     // 2. Prevent Tab Close / Refresh
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      // Required for Chrome to show the browser's native confirmation dialog
       e.returnValue = ''; 
       return '';
     };
 
+    // 3. Block Keyboard Shortcuts (F5, Ctrl+R, Alt+Left, etc.)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F5 or Ctrl+R / Cmd+R (Reload)
+      if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
+        e.preventDefault();
+      }
+      // Alt + Left (Back)
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+      }
+      // Command + [ (Back on Mac)
+      if (e.metaKey && e.key === '[') {
+        e.preventDefault();
+      }
+    };
+
+    // 4. Block Right Click (Prevent Context Menu Back/Reload)
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
 
@@ -103,10 +124,9 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
       playSound('correct');
       setScore(prev => prev + 1);
     } else {
-      // Incorrect answer: Sound + Vibrate + Shake
       playSound('incorrect');
       if (navigator.vibrate) {
-        navigator.vibrate(200); // Vibrate for 200ms
+        navigator.vibrate(200); 
       }
       setShake(true);
       setTimeout(() => setShake(false), 500);
