@@ -28,11 +28,16 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
   // 🛡️ STRICT NAVIGATION GUARD (Prevent Back/Refresh/Close)
   // -------------------------------------------------------------------------
   useEffect(() => {
-    // 1. Disable Back Button (Push Dummy State)
+    // 1. History Trap Strategy (Stronger)
+    // Push multiple states to create a buffer against rapid back clicks.
+    window.history.pushState(null, '', window.location.href);
+    window.history.pushState(null, '', window.location.href);
     window.history.pushState(null, '', window.location.href);
 
     const handlePopState = (e: PopStateEvent) => {
+      // Prevent navigation by immediately pushing state back
       window.history.pushState(null, '', window.location.href);
+      // Alert to interrupt flow
       alert("🚫 [경고] 시험 중에는 뒤로가기가 금지되어 있습니다.");
     };
 
