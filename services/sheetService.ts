@@ -84,10 +84,10 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
     const words: SheetWord[] = [];
 
     // Define column indices based on mode
-    // TEST Mode: A(0), B(1)
-    // PRACTICE Mode: D(3), E(4)
-    const wordColIdx = mode === 'PRACTICE' ? 3 : 0;
-    const meaningColIdx = mode === 'PRACTICE' ? 4 : 1;
+    // TEST Mode: B(1), C(2) (A is 범위)
+    // PRACTICE Mode: F(5), G(6) (E is 범위)
+    const wordColIdx = mode === 'PRACTICE' ? 5 : 1;
+    const meaningColIdx = mode === 'PRACTICE' ? 6 : 2;
 
     for (let i = 0; i < lines.length; i++) {
       // Always skip the first row (Header)
@@ -126,7 +126,7 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
     }
 
     if (words.length === 0) {
-      const colName = mode === 'PRACTICE' ? 'D, E열' : 'A, B열';
+      const colName = mode === 'PRACTICE' ? 'F, G열' : 'B, C열';
       throw new Error(`데이터를 찾을 수 없습니다. (${colName}에 단어와 뜻이 있는지 확인해주세요)`);
     }
 

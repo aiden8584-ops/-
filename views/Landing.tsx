@@ -30,7 +30,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   const [blockInfo, setBlockInfo] = useState<{ isOpen: boolean; reason: string; key: string } | null>(null);
   const [resetPassword, setResetPassword] = useState('');
   
-  const PRESET_TABS = ['예비고1', '예비고2', '예비고3'];
+  const PRESET_TABS = ['서울1', '상문1', '서초1', '서울2', '상문2', '서초2', '수능반'];
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   
   const nameInputRef = useRef<HTMLInputElement>(null);
