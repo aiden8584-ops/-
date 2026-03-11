@@ -13,7 +13,7 @@ const ACCESS_CODE_KEY = 'vocamaster_required_ac';
 
 const APP_VERSION = "v1.42 (Instant Code Sync)";
 
-const PRESET_TABS = ['서울1', '상문1', '서초1', '서울2', '상문2', '서초2', '수능반'];
+const PRESET_TABS = ['서울1', '상문1', '서초1', '서울2', '상문2', '서초2', '수능반', '수능반(클리닉)'];
 
 const TeacherDashboard: React.FC = () => {
   const [sheetId, setSheetId] = useState('');
