@@ -99,6 +99,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
       timerRef.current = window.setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
             handleTimeOut();
             return 0;
           }
@@ -125,14 +126,15 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
 
     const isCorrect = optionIndex === currentQuestion.correctAnswerIndex;
 
-    // Silent Scoring (No visual/audio feedback during test)
     if (isCorrect) {
       setScore(prev => prev + 1);
+      playSound('correct');
     } else {
       setWrongQuestions(prev => [...prev, currentQuestion]);
+      playSound('incorrect');
     }
 
-    // Move to next question faster since there is no feedback to read
+    // Move to next question after a short delay for feedback
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
         setCurrentIndex(prev => prev + 1);
@@ -143,15 +145,24 @@ const Quiz: React.FC<QuizProps> = ({ questions, settings, onComplete }) => {
         const finalTime = Math.floor((Date.now() - startTime) / 1000);
         onComplete(isCorrect ? score + 1 : score, questions.length, finalTime, isCorrect ? wrongQuestions : [...wrongQuestions, currentQuestion]);
       }
-    }, 600); // 600ms delay for visual confirmation of selection
+    }, 1200); // 1200ms delay for visual confirmation of selection
   };
 
   const getButtonClass = (index: number) => {
     if (!isAnswered) return "bg-white hover:bg-gray-50 border-gray-200 text-gray-700";
     
-    // Feedback Hidden Mode: Only highlight selected option neutrally
     if (index === selectedOption) {
-      return "bg-indigo-600 border-indigo-600 text-white font-bold shadow-md transform scale-[1.02] ring-0";
+      const isCorrect = index === currentQuestion.correctAnswerIndex;
+      if (isCorrect) {
+        return "bg-green-500 border-green-500 text-white font-bold shadow-md transform scale-[1.02] ring-0";
+      } else {
+        return "bg-red-500 border-red-500 text-white font-bold shadow-md transform scale-[1.02] ring-0";
+      }
+    }
+    
+    // Highlight correct answer if user got it wrong
+    if (index === currentQuestion.correctAnswerIndex) {
+      return "bg-green-100 border-green-500 text-green-800 font-bold";
     }
     
     // Other options fade out slightly

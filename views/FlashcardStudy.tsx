@@ -17,10 +17,6 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   const [markedWords, setMarkedWords] = useState<Set<string>>(new Set());
   const [isShuffled, setIsShuffled] = useState(false);
   const [isSessionEnded, setIsSessionEnded] = useState(false);
-  
-  // Timer State
-  const [timeLeft, setTimeLeft] = useState(5);
-  const autoNextTimeoutRef = useRef<number | null>(null);
 
   // Initialize
   useEffect(() => {
@@ -30,45 +26,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
     setCurrentIndex(0);
   }, [words]);
 
-  // Timer Logic
-  useEffect(() => {
-    // Reset timer when index changes
-    setTimeLeft(5);
-    if (autoNextTimeoutRef.current) {
-      clearTimeout(autoNextTimeoutRef.current);
-      autoNextTimeoutRef.current = null;
-    }
-  }, [currentIndex, isSessionEnded]);
-
-  useEffect(() => {
-    // Stop timer if answered, flipped, or session ended
-    if (isFlipped || isSessionEnded) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAutoFlip();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [currentIndex, isFlipped, isSessionEnded]);
-
-  const handleAutoFlip = () => {
-    setIsFlipped(true); // Show Meaning
-    
-    // Auto advance after 1.5 seconds
-    autoNextTimeoutRef.current = window.setTimeout(() => {
-      handleNext();
-    }, 1500);
-  };
-
   const handleNext = () => {
-    if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
     
     if (currentIndex < currentQueue.length - 1) {
       setIsFlipped(false);
@@ -80,7 +38,6 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
   };
 
   const handlePrev = () => {
-    if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
     if (currentIndex > 0) {
       setIsFlipped(false);
       setTimeout(() => setCurrentIndex(prev => prev - 1), 150);
@@ -214,14 +171,6 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
         </div>
         
         <div className="flex items-center gap-3">
-            {/* Timer Badge */}
-            {!isFlipped && (
-                <div className={`flex flex-col items-center px-3 py-1 rounded-xl border-2 transition-colors ${timeLeft <= 3 ? 'border-red-100 bg-red-50' : 'border-indigo-100 bg-indigo-50'}`}>
-                    <span className={`text-[10px] font-black uppercase ${timeLeft <= 3 ? 'text-red-400' : 'text-indigo-400'}`}>Time</span>
-                    <span className={`text-xl font-black leading-none ${timeLeft <= 3 ? 'text-red-600 animate-pulse' : 'text-indigo-600'}`}>{timeLeft}s</span>
-                </div>
-            )}
-
             {/* Counter */}
             <div className="bg-white px-5 py-3 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-gray-100 flex items-baseline gap-1.5">
               <span className="text-3xl font-black text-indigo-600 leading-none">{currentIndex + 1}</span>
@@ -270,7 +219,7 @@ const FlashcardStudy: React.FC<FlashcardStudyProps> = ({ words, setTitle, onFini
 
              <div className="flex justify-center h-10">
                 <p className="text-sm text-gray-300 font-bold animate-pulse">
-                    {timeLeft > 0 ? `${timeLeft}초 후 자동 공개` : '탭하여 뜻 확인'}
+                    탭하여 뜻 확인
                 </p>
              </div>
           </div>

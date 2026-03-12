@@ -52,7 +52,6 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPr
   const allWords = sheetWords.map(sw => sw.word);
 
   // Distribute Question Types
-  // If we are falling back from AI failure (Context > 0), we distribute Context items to EK/KE
   let targetEK = 0;
   
   if (isPractice) {
@@ -64,7 +63,17 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPr
     targetEK = dist.engToKor + contextHalf;
   }
 
-  let currentEK = targetEK;
+  // Create an array of types and shuffle it
+  const typesArray: ('engToKor' | 'korToEng')[] = [];
+  for (let i = 0; i < targetWords.length; i++) {
+    if (i < targetEK) {
+      typesArray.push('engToKor');
+    } else {
+      typesArray.push('korToEng');
+    }
+  }
+  const shuffledTypes = shuffleArray(typesArray);
+
   let lastAnswerIndex = -1;
 
   return targetWords.map((sw, idx) => {
@@ -72,15 +81,8 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPr
     let correctAnswer = '';
     let distractorsPool: string[] = [];
     
-    // Determine type
-    let type: 'engToKor' | 'korToEng' = 'engToKor';
-    
-    if (currentEK > 0) {
-      type = 'engToKor';
-      currentEK--;
-    } else {
-      type = 'korToEng';
-    }
+    // Determine type from shuffled array
+    let type = shuffledTypes[idx];
 
     if (type === 'engToKor') {
       showWord = sw.word;
@@ -209,10 +211,13 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     
     const rawQuestions = JSON.parse(text) as { id: number, type: string, questionText: string, correctAnswerString: string, distractors: string[] }[];
     
+    // Shuffle the questions so the types are distributed randomly
+    const shuffledQuestions = shuffleArray(rawQuestions);
+    
     // Post-processing: Shuffle Options & Anti-consecutive Logic
     let lastAnswerIndex = -1;
 
-    return rawQuestions.map((q, idx) => {
+    return shuffledQuestions.map((q, idx) => {
       const correct = q.correctAnswerString;
       // Use AI provided distractors which are POS-matched
       const distractors = q.distractors;
