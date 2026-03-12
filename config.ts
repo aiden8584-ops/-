@@ -21,12 +21,12 @@ export const APP_CONFIG = {
   // [기본 퀴즈 설정]
   defaultSettings: {
     totalQuestions: 50,
-    timeLimitPerQuestion: 0, // 0이면 무제한
+    timeLimitPerQuestion: 15, // 15초 제한
     questionType: "mixed" as const,
     typeDistribution: {
-      engToKor: 25,
-      korToEng: 25,
-      context: 0
+      engToKor: 20,
+      korToEng: 20,
+      context: 10
     },
     useAi: true
   }

@@ -8,7 +8,7 @@ import { QuestionType, TypeDistribution } from '../types';
 const SHEET_ID_KEY = 'vocamaster_sheet_id';
 const SCRIPT_URL_KEY = 'vocamaster_script_url';
 const BASE_URL_KEY = 'vocamaster_base_url';
-const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
+const SETTINGS_KEY = 'vocamaster_quiz_settings_v3';
 const ACCESS_CODE_KEY = 'vocamaster_required_ac';
 
 const APP_VERSION = "v1.42 (Instant Code Sync)";

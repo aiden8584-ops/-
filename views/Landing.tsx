@@ -36,7 +36,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   useEffect(() => {
     const SHEET_KEY = 'vocamaster_sheet_id';
     const SCRIPT_KEY = 'vocamaster_script_url';
-    const SETTINGS_KEY = 'vocamaster_quiz_settings_v2';
+    const SETTINGS_KEY = 'vocamaster_quiz_settings_v3';
     
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet_id');
@@ -221,7 +221,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     if (confirm('시험지 설정 및 접속 정보를 초기화하시겠습니까?\n(새로운 QR코드를 스캔해야 합니다)')) {
       localStorage.removeItem('vocamaster_sheet_id');
       localStorage.removeItem('vocamaster_required_ac');
-      localStorage.removeItem('vocamaster_quiz_settings_v2');
+      localStorage.removeItem('vocamaster_quiz_settings_v3');
       window.location.reload();
     }
   };
