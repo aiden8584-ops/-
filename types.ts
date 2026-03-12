@@ -67,4 +67,5 @@ export interface UserSession {
 export interface SheetWord {
   word: string;
   meaning: string;
+  range?: string;
 }

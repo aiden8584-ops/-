@@ -86,8 +86,11 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
     // Define column indices based on mode
     // TEST Mode: B(1), C(2) (A is 범위)
     // PRACTICE Mode: F(5), G(6) (E is 범위)
+    const rangeColIdx = mode === 'PRACTICE' ? 4 : 0;
     const wordColIdx = mode === 'PRACTICE' ? 5 : 1;
     const meaningColIdx = mode === 'PRACTICE' ? 6 : 2;
+
+    let currentRange = "기본 범위";
 
     for (let i = 0; i < lines.length; i++) {
       // Always skip the first row (Header)
@@ -97,6 +100,11 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
       if (!line) continue;
 
       const cols = parseCSVLine(line);
+      
+      // Update current range if the cell is not empty
+      if (cols[rangeColIdx] && cols[rangeColIdx].trim() !== '') {
+        currentRange = cols[rangeColIdx].trim();
+      }
       
       // Check if we have enough columns for the requested indices
       if (cols.length > Math.max(wordColIdx, meaningColIdx)) {
@@ -119,7 +127,7 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
           cleanedMeaning = cleanedMeaning.replace(/^,|,$/g, '').trim();
 
           if (cleanedMeaning) {
-             words.push({ word, meaning: cleanedMeaning });
+             words.push({ word, meaning: cleanedMeaning, range: currentRange });
           }
         }
       }
