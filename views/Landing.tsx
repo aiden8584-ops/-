@@ -20,12 +20,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   // Custom Settings
   const [quizSettings, setQuizSettings] = useState<QuizSettings>(APP_CONFIG.defaultSettings);
   
-  // Access Control & Blocking
-  const [requiredAccessCode, setRequiredAccessCode] = useState<string | null>(null);
-  const [inputAccessCode, setInputAccessCode] = useState('');
-  const [showAccessModal, setShowAccessModal] = useState(false);
-  const [accessError, setAccessError] = useState(false);
-
   // Block Modal State
   const [blockInfo, setBlockInfo] = useState<{ isOpen: boolean; reason: string; key: string } | null>(null);
   const [resetPassword, setResetPassword] = useState('');
@@ -62,9 +56,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     
     // New AI Param
     const paramUseAi = params.get('use_ai');
-    
-    // Access Code
-    const ac = params.get('ac');
 
     // 1. Sheet ID Logic
     if (urlSheetId) {
@@ -90,24 +81,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       setClassName(urlClass);
       setIsUrlInitialized(true);
       setTimeout(() => nameInputRef.current?.focus(), 500);
-    }
-    
-    // 3.5 Access Code Logic (Improved persistence)
-    if (ac) {
-      // Case 1: Explicit Access Code in URL -> Save and Enforce
-      const code = ac.trim();
-      localStorage.setItem(ACCESS_CODE_KEY, code);
-      setRequiredAccessCode(code);
-    } else if (urlSheetId) {
-      // Case 2: New Sheet Link BUT No Access Code -> Clear previous restriction (Open access)
-      localStorage.removeItem(ACCESS_CODE_KEY);
-      setRequiredAccessCode(null);
-    } else {
-      // Case 3: No URL params (Reload or Back from Quiz) -> Restore from Storage
-      const storedAc = localStorage.getItem(ACCESS_CODE_KEY);
-      if (storedAc) {
-        setRequiredAccessCode(storedAc);
-      }
     }
 
     // 4. Quiz Settings Logic
@@ -167,19 +140,10 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       useAi: newUseAi
     });
     
-    // Clean URL (but keep access code in state/storage)
-    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi || ac) {
+    // Clean URL
+    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
-
-    // Listen for storage changes (Same device sync)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === ACCESS_CODE_KEY) {
-        setRequiredAccessCode(e.newValue);
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
 
   }, []);
 
@@ -227,58 +191,13 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                return;
             }
           } catch (e) {
-            // Ignore parse errors, proceed to access code check
+            // Ignore parse errors
           }
         }
       }
       // -----------------------------------------------------------
 
-      // FORCE FRESH CHECK: Read directly from localStorage
-      const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
-      
-      if (freshAccessCode !== requiredAccessCode) {
-        setRequiredAccessCode(freshAccessCode);
-      }
-
-      if (mode === 'TEST' && freshAccessCode) {
-        setShowAccessModal(true);
-        setTimeout(() => codeInputRef.current?.focus(), 100);
-      } else {
-        onStart(name.trim(), className.trim(), testDate, quizSettings, mode);
-      }
-    }
-  };
-
-  const verifyAccessCode = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const freshAccessCode = localStorage.getItem(ACCESS_CODE_KEY);
-    
-    if (inputAccessCode === freshAccessCode) {
-      // 🛡️ DOUBLE CHECK BLOCKING (Safety net)
-      const attemptKey = getAttemptKey(testDate, className, name);
-      const existing = localStorage.getItem(attemptKey);
-      if (existing) {
-         try {
-           const rec = JSON.parse(existing);
-           if (rec.status === 'STARTED' || rec.status === 'ABANDONED') {
-              setBlockInfo({ isOpen: true, reason: 'abandoned', key: attemptKey });
-              setShowAccessModal(false);
-              return;
-           }
-           if (rec.status === 'COMPLETED') {
-              setBlockInfo({ isOpen: true, reason: 'completed', key: attemptKey });
-              setShowAccessModal(false);
-              return;
-           }
-         } catch(e){}
-      }
-
-      setShowAccessModal(false);
-      onStart(name.trim(), className.trim(), testDate, quizSettings, 'TEST');
-    } else {
-      setAccessError(true);
-      setInputAccessCode('');
-      setTimeout(() => setAccessError(false), 500);
+      onStart(name.trim(), className.trim(), testDate, quizSettings, mode);
     }
   };
 
@@ -356,49 +275,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         </div>
       )}
 
-      {/* Access Code Modal */}
-      {showAccessModal && !blockInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-pop p-4">
-          <div className={`bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl ${accessError ? 'animate-shake' : ''}`}>
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-                🔒
-              </div>
-              <h3 className="text-xl font-black text-gray-900">선생님 확인 대기</h3>
-              <p className="text-gray-500 text-sm mt-2">
-                선생님이 알려주시는<br/>
-                <span className="text-indigo-600 font-bold">접속 코드(비밀번호)</span>를 입력해주세요.
-              </p>
-            </div>
-            
-            <form onSubmit={verifyAccessCode} className="space-y-4">
-              <input
-                ref={codeInputRef}
-                type="text" 
-                pattern="[0-9]*"
-                inputMode="numeric"
-                value={inputAccessCode}
-                onChange={(e) => setInputAccessCode(e.target.value)}
-                className="w-full text-center text-3xl font-black tracking-widest py-4 border-b-2 border-gray-200 focus:border-indigo-600 outline-none transition-colors placeholder-gray-200"
-                placeholder="0000"
-                maxLength={8}
-                autoComplete="off"
-              />
-              <Button type="submit" fullWidth size="lg" className="rounded-xl shadow-lg shadow-indigo-200">
-                시험 시작 확인
-              </Button>
-              <button 
-                type="button" 
-                onClick={() => setShowAccessModal(false)}
-                className="w-full py-3 text-sm font-bold text-gray-400 hover:text-gray-600"
-              >
-                취소
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
       <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-indigo-50 relative">
         <div className="bg-indigo-600 p-10 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
@@ -467,11 +343,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                   className="text-xl py-6 shadow-2xl rounded-[1.5rem] font-black relative overflow-hidden group"
                 >
                   <span className="relative z-10">시험 시작하기</span>
-                  {requiredAccessCode && (
-                    <div className="absolute top-2 right-3 z-10 text-[10px] bg-black/20 px-2 py-0.5 rounded-full text-white font-bold flex items-center gap-1">
-                       🔒 잠금
-                    </div>
-                  )}
                 </Button>
                 
                 <Button 
