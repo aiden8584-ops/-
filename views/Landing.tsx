@@ -21,6 +21,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   const [showPWAInstructions, setShowPWAInstructions] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isInAppBrowser, setIsInAppBrowser] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   // Custom Settings
   const [quizSettings, setQuizSettings] = useState<QuizSettings>(APP_CONFIG.defaultSettings);
@@ -52,6 +53,13 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const ua = navigator.userAgent.toUpperCase();
     const inApp = /KAKAOTALK|Line|NAVER|FBAN|FBAV/.test(ua);
     setIsInAppBrowser(inApp);
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet_id');
@@ -174,6 +182,11 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const loadTabs = async (id: string) => {
@@ -261,7 +274,13 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pop pb-10">
       
       {/* PWA Instructions Modal */}
-      {showPWAInstructions && <PWAInstructions onClose={() => setShowPWAInstructions(false)} />}
+      {showPWAInstructions && (
+        <PWAInstructions 
+          onClose={() => setShowPWAInstructions(false)} 
+          deferredPrompt={deferredPrompt}
+          onInstallSuccess={() => setDeferredPrompt(null)}
+        />
+      )}
 
       {/* 🛡️ BLOCKING MODAL (Restart Prevention) */}
       {blockInfo && blockInfo.isOpen && (

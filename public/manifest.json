@@ -1,20 +1,20 @@
 {
-  "name": "스마트 시험 시스템",
-  "short_name": "스마트시험",
-  "description": "QR 코드를 통해 접속하는 스마트 시험 시스템",
+  "name": "PIF단어 시험 시스템",
+  "short_name": "PIF단어",
+  "description": "PIF영어학원 스마트 단어 시험 시스템",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
+  "theme_color": "#4f46e5",
   "icons": [
     {
-      "src": "https://picsum.photos/seed/exam/192/192",
+      "src": "https://picsum.photos/seed/pif-logo/192/192",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://picsum.photos/seed/exam/512/512",
+      "src": "https://picsum.photos/seed/pif-logo/512/512",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

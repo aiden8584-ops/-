@@ -4,12 +4,26 @@ import { Share, PlusSquare, ExternalLink, Smartphone } from 'lucide-react';
 
 interface PWAInstructionsProps {
   onClose: () => void;
+  deferredPrompt?: any;
+  onInstallSuccess?: () => void;
 }
 
-const PWAInstructions: React.FC<PWAInstructionsProps> = ({ onClose }) => {
+const PWAInstructions: React.FC<PWAInstructionsProps> = ({ onClose, deferredPrompt, onInstallSuccess }) => {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroid = /Android/.test(navigator.userAgent);
   const isInApp = /KAKAOTALK|Line|NAVER|FBAN|FBAV/.test(navigator.userAgent.toUpperCase());
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      onInstallSuccess?.();
+      onClose();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -45,7 +59,22 @@ const PWAInstructions: React.FC<PWAInstructionsProps> = ({ onClose }) => {
         )}
 
         <div className="space-y-6">
-          {isIOS ? (
+          {deferredPrompt ? (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 text-center">
+              <p className="text-sm text-indigo-900 font-bold mb-4">
+                이 기기는 자동 설치를 지원합니다!
+              </p>
+              <button 
+                onClick={handleInstallClick}
+                className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95"
+              >
+                지금 바로 앱 설치하기
+              </button>
+              <p className="text-[10px] text-indigo-400 mt-3">
+                버튼을 누른 후 나타나는 팝업에서 '설치'를 눌러주세요.
+              </p>
+            </div>
+          ) : isIOS ? (
             <div className="space-y-4">
               <div className="flex items-start gap-4">
                 <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">1</div>
