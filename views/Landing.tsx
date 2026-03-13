@@ -26,6 +26,8 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   // Custom Settings
   const [quizSettings, setQuizSettings] = useState<QuizSettings>(APP_CONFIG.defaultSettings);
   
+  // Block Modal State
+  const [blockInfo, setBlockInfo] = useState<{ isOpen: boolean; reason: string; key: string } | null>(null);
   const [resetPassword, setResetPassword] = useState('');
   
   const PRESET_TABS = ['서울1', '상문1', '서초1', '서울2', '상문2', '서초2', '수능반', '수능반(클리닉)'];
@@ -204,19 +206,57 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
   const handleStart = (mode: 'TEST' | 'PRACTICE') => {
     if (name.trim() && className.trim() && testDate) {
+      
+      // -----------------------------------------------------------
+      // 🛡️ RESTART PREVENTION CHECK (Logic Updated to use Modal)
+      // -----------------------------------------------------------
+      if (mode === 'TEST') {
+        const attemptKey = getAttemptKey(testDate, className, name);
+        const existingRecord = localStorage.getItem(attemptKey);
+        
+        if (existingRecord) {
+          try {
+            const record = JSON.parse(existingRecord);
+            if (record.status === 'COMPLETED') {
+               setBlockInfo({ 
+                 isOpen: true, 
+                 reason: 'completed', 
+                 key: attemptKey 
+               });
+               return;
+            } else if (record.status === 'STARTED' || record.status === 'ABANDONED') {
+               setBlockInfo({ 
+                 isOpen: true, 
+                 reason: 'abandoned', 
+                 key: attemptKey 
+               });
+               return;
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+      // -----------------------------------------------------------
+
       onStart(name.trim(), className.trim(), testDate, quizSettings, mode);
     }
   };
 
   const handleAdminReset = (e: React.FormEvent) => {
     e.preventDefault();
-    // This function is now mostly unused but kept for potential future admin features
-    if (resetPassword === APP_CONFIG.adminPassword) {
-      alert("관리자 확인되었습니다.");
+    // Only allow the Master Password 'teacher'
+    if (resetPassword === 'teacher') {
+      if (blockInfo?.key) {
+        localStorage.removeItem(blockInfo.key);
+        setBlockInfo(null);
+        setResetPassword('');
+        alert("✅ 기록이 초기화되었습니다.\n다시 시험을 시작할 수 있습니다.");
+      }
     } else {
       alert("⛔ 관리자 비밀번호가 올바르지 않습니다.");
+      setResetPassword('');
     }
-    setResetPassword('');
   };
   
   const handleResetSettings = () => {
@@ -227,18 +267,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       localStorage.removeItem('vocamaster_last_class');
       localStorage.removeItem('vocamaster_last_date');
       window.location.reload();
-    }
-  };
-
-  const handlePWAInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
-    } else {
-      setShowPWAInstructions(true);
     }
   };
 
@@ -254,6 +282,52 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         />
       )}
 
+      {/* 🛡️ BLOCKING MODAL (Restart Prevention) */}
+      {blockInfo && blockInfo.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md animate-pop p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl border-2 border-red-100">
+            <div className="text-center mb-6">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl ${blockInfo.reason === 'completed' ? 'bg-green-100' : 'bg-red-100'}`}>
+                {blockInfo.reason === 'completed' ? '✅' : '🚨'}
+              </div>
+              <h3 className="text-xl font-black text-gray-900">
+                {blockInfo.reason === 'completed' ? '이미 제출된 시험입니다' : '부정행위 방지 차단'}
+              </h3>
+              <p className="text-gray-500 text-sm mt-2 whitespace-pre-line leading-relaxed">
+                {blockInfo.reason === 'completed' 
+                  ? "이미 시험을 완료하고 제출했습니다.\n재시험을 원하시면 선생님께 문의하세요." 
+                  : "시험 도중 화면을 이탈하거나 종료한\n기록이 있어 재입장이 불가능합니다."}
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 text-center">선생님 권한으로 잠금 해제</p>
+              <form onSubmit={handleAdminReset} className="flex gap-2">
+                <input 
+                  ref={resetInputRef}
+                  type="password" 
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="관리자 암호 입력"
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:border-indigo-500"
+                />
+                <button type="submit" className="bg-gray-800 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-black transition-colors">
+                  해제
+                </button>
+              </form>
+            </div>
+
+            <button 
+              type="button" 
+              onClick={() => setBlockInfo(null)}
+              className="w-full py-3 text-sm font-bold text-gray-400 hover:text-gray-600 underline"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-indigo-50 relative">
         <div className="bg-indigo-600 p-10 text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
@@ -264,7 +338,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           
           {!isStandalone && (
             <button 
-              onClick={handlePWAInstall}
+              onClick={() => setShowPWAInstructions(true)}
               className="mt-4 relative z-10 inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold px-3 py-1.5 rounded-full backdrop-blur-sm transition-all"
             >
               <Smartphone className="w-3 h-3" />

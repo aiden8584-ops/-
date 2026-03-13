@@ -10,16 +10,16 @@
 
 export const APP_CONFIG = {
   // 1. 구글 시트 ID (URL의 /d/ 와 /edit 사이의 값)
+  // 예: https://docs.google.com/spreadsheets/d/1BxiMIG0W0zkSUTfgL3Y71S76L33yQLX_7uWdzLp-W8g/edit
+  // 에서 "1BxiMIG0W0zkSUTfgL3Y71S76L33yQLX_7uWdzLp-W8g" 부분이 ID입니다.
   sheetId: "", 
   
-  // 2. Apps Script 배포 URL
+  // 2. Apps Script 배포 URL (결과 전송용)
+  // 선생님 관리 페이지에서 설정하거나 여기에 직접 입력할 수 있습니다.
   scriptUrl: "",
   
-  // 3. 배포된 사이트 주소
+  // 3. 배포된 사이트 주소 (QR코드 생성용)
   baseUrl: "",
-
-  // 4. 관리자 비밀번호 (선생님 로그인 및 재시험 해제용)
-  adminPassword: "teacher",
 
   // [기본 퀴즈 설정]
   defaultSettings: {

@@ -11,6 +11,7 @@ import FlashcardStudy from './views/FlashcardStudy';
 import { generateQuizQuestions } from './services/geminiService';
 import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
 import { APP_CONFIG } from './config';
+import { SAMPLE_WORDS } from './constants/sampleData';
 
 const RESULT_STORAGE_KEY = 'vocamaster_results';
 const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
@@ -118,9 +119,17 @@ function App() {
 
     try {
       const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
-      if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
       
-      const sheetWords = await fetchWordsFromSheet(sheetId, className, mode);
+      let sheetWords: SheetWord[] = [];
+      
+      if (sheetId === 'sample') {
+        sheetWords = SAMPLE_WORDS;
+        // Artificial delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 800));
+      } else {
+        if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
+        sheetWords = await fetchWordsFromSheet(sheetId, className, mode);
+      }
       
       if (mode === 'PRACTICE') {
         setRawPracticeWords(sheetWords);
@@ -202,20 +211,8 @@ function App() {
         return (
           <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-gray-100 animate-pop text-center">
             <h2 className="text-2xl font-bold mb-6">선생님 로그인</h2>
-            <input 
-              type="password" 
-              value={accessCode} 
-              onChange={(e) => setAccessCode(e.target.value)} 
-              onKeyDown={(e) => e.key === 'Enter' && (accessCode === APP_CONFIG.adminPassword ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error'))} 
-              className="w-full px-4 py-2 border rounded-lg mb-4" 
-              placeholder="Password" 
-            />
-            <button 
-              onClick={() => accessCode === APP_CONFIG.adminPassword ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error')} 
-              className="w-full bg-indigo-600 text-white py-2 rounded-lg"
-            >
-              Enter
-            </button>
+            <input type="password" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (accessCode === 'teacher' ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error'))} className="w-full px-4 py-2 border rounded-lg mb-4" placeholder="Password" />
+            <button onClick={() => accessCode === 'teacher' ? setCurrentView(AppView.TEACHER_DASHBOARD) : setLoginError('Error')} className="w-full bg-indigo-600 text-white py-2 rounded-lg">Enter</button>
           </div>
         );
       case AppView.TEACHER_DASHBOARD:
