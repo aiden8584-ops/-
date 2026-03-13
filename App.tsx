@@ -11,6 +11,7 @@ import FlashcardStudy from './views/FlashcardStudy';
 import { generateQuizQuestions } from './services/geminiService';
 import { fetchWordsFromSheet, submitResultToSheet } from './services/sheetService';
 import { APP_CONFIG } from './config';
+import { SAMPLE_WORDS } from './constants/sampleData';
 
 const RESULT_STORAGE_KEY = 'vocamaster_results';
 const INCORRECT_STORAGE_KEY = 'vocamaster_incorrect_notes';
@@ -118,9 +119,17 @@ function App() {
 
     try {
       const sheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
-      if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
       
-      const sheetWords = await fetchWordsFromSheet(sheetId, className, mode);
+      let sheetWords: SheetWord[] = [];
+      
+      if (sheetId === 'sample') {
+        sheetWords = SAMPLE_WORDS;
+        // Artificial delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 800));
+      } else {
+        if (!sheetId) throw new Error("시트 ID 설정이 필요합니다.");
+        sheetWords = await fetchWordsFromSheet(sheetId, className, mode);
+      }
       
       if (mode === 'PRACTICE') {
         setRawPracticeWords(sheetWords);

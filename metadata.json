@@ -1,5 +1,5 @@
 {
-  "name": "단어시험앱",
-  "description": "A smart vocabulary testing platform that simulates daily curriculum from Google Sheets using Gemini AI. Features student self-testing, instant feedback, and a teacher dashboard.",
+  "name": "스마트 시험 시스템",
+  "description": "QR 코드를 통해 간편하게 접속하고 홈 화면에 추가하여 앱처럼 사용할 수 있는 시험 플랫폼입니다. 시험 정보 자동 저장 기능을 통해 홈 화면 접속 시에도 시험 정보를 잃지 않습니다.",
   "requestFramePermissions": []
 }

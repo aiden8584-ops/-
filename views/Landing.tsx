@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Button from '../components/Button';
+import PWAInstructions from '../components/PWAInstructions';
 import { AppView, QuizSettings, QuestionType, TypeDistribution } from '../types';
 import { fetchSheetTabs } from '../services/sheetService';
 import { APP_CONFIG } from '../config';
+import { Smartphone, Info } from 'lucide-react';
 
 interface LandingProps {
   onStart: (name: string, className: string, date: string, settings: QuizSettings, mode: 'TEST' | 'PRACTICE') => void;
@@ -16,6 +18,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   const [testDate, setTestDate] = useState(new Date().toISOString().split('T')[0]);
   const [hasSheetId, setHasSheetId] = useState(false);
   const [isUrlInitialized, setIsUrlInitialized] = useState(false);
+  const [showPWAInstructions, setShowPWAInstructions] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
   
   // Custom Settings
   const [quizSettings, setQuizSettings] = useState<QuizSettings>(APP_CONFIG.defaultSettings);
@@ -37,7 +42,17 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     const SHEET_KEY = 'vocamaster_sheet_id';
     const SCRIPT_KEY = 'vocamaster_script_url';
     const SETTINGS_KEY = 'vocamaster_quiz_settings_v3';
+    const CLASS_NAME_KEY = 'vocamaster_last_class';
+    const TEST_DATE_KEY = 'vocamaster_last_date';
     
+    // Check Standalone / In-App
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    setIsStandalone(!!standalone);
+    
+    const ua = navigator.userAgent.toUpperCase();
+    const inApp = /KAKAOTALK|Line|NAVER|FBAN|FBAV/.test(ua);
+    setIsInAppBrowser(inApp);
+
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet_id');
     const urlScript = params.get('script');
@@ -76,11 +91,25 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     }
 
     // 3. Class & Date Logic
-    if (urlDate) setTestDate(urlDate);
+    if (urlDate) {
+      setTestDate(urlDate);
+      localStorage.setItem(TEST_DATE_KEY, urlDate);
+    } else {
+      const storedDate = localStorage.getItem(TEST_DATE_KEY);
+      if (storedDate) setTestDate(storedDate);
+    }
+
     if (urlClass) {
       setClassName(urlClass);
+      localStorage.setItem(CLASS_NAME_KEY, urlClass);
       setIsUrlInitialized(true);
       setTimeout(() => nameInputRef.current?.focus(), 500);
+    } else {
+      const storedClass = localStorage.getItem(CLASS_NAME_KEY);
+      if (storedClass) {
+        setClassName(storedClass);
+        setIsUrlInitialized(true);
+      }
     }
 
     // 4. Quiz Settings Logic
@@ -222,6 +251,8 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       localStorage.removeItem('vocamaster_sheet_id');
       localStorage.removeItem('vocamaster_required_ac');
       localStorage.removeItem('vocamaster_quiz_settings_v3');
+      localStorage.removeItem('vocamaster_last_class');
+      localStorage.removeItem('vocamaster_last_date');
       window.location.reload();
     }
   };
@@ -229,6 +260,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-pop pb-10">
       
+      {/* PWA Instructions Modal */}
+      {showPWAInstructions && <PWAInstructions onClose={() => setShowPWAInstructions(false)} />}
+
       {/* 🛡️ BLOCKING MODAL (Restart Prevention) */}
       {blockInfo && blockInfo.isOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md animate-pop p-4">
@@ -282,9 +316,29 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
           <p className="text-indigo-100 font-bold relative z-10 text-sm">
             {isUrlInitialized ? `[${className}] 반 시험 준비 완료` : '스마트 단어 테스트 시스템'}
           </p>
+          
+          {!isStandalone && (
+            <button 
+              onClick={() => setShowPWAInstructions(true)}
+              className="mt-4 relative z-10 inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold px-3 py-1.5 rounded-full backdrop-blur-sm transition-all"
+            >
+              <Smartphone className="w-3 h-3" />
+              홈 화면에 앱으로 추가하기
+            </button>
+          )}
         </div>
         
         <form onSubmit={(e) => e.preventDefault()} className="p-8 md:p-10 space-y-8">
+          {isInAppBrowser && !isStandalone && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3 animate-pop">
+              <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-800 leading-relaxed">
+                <p className="font-bold mb-1">인앱 브라우저 접속 중</p>
+                카카오톡/네이버 등에서는 홈 화면 추가가 원활하지 않을 수 있습니다. <b>'기본 브라우저(Safari/Chrome)로 열기'</b>를 권장합니다.
+              </div>
+            </div>
+          )}
+
           {!hasSheetId ? (
              <div className="bg-amber-50 border-2 border-amber-100 rounded-3xl p-8 text-center animate-pop">
               <h3 className="text-lg font-bold text-amber-900 mb-2">시험지 정보가 없습니다</h3>
