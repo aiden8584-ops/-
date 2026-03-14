@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppView, UserSession, QuizResult, Question, IncorrectWord, QuizSettings, SheetWord } from './types';
+import StudentLogin from './views/StudentLogin';
 import Landing from './views/Landing';
 import Quiz from './views/Quiz';
 import Result from './views/Result';
@@ -24,7 +25,8 @@ const getAttemptKey = (date: string, className: string, name: string) => {
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState<AppView>(AppView.LANDING);
+  const [currentView, setCurrentView] = useState<AppView>(AppView.STUDENT_LOGIN);
+  const [loggedInStudent, setLoggedInStudent] = useState<string>('');
   const [session, setSession] = useState<UserSession | null>(null);
   
   // Data State
@@ -48,6 +50,12 @@ function App() {
     const stored = localStorage.getItem(INCORRECT_STORAGE_KEY);
     if (stored) {
       try { setIncorrectRecords(JSON.parse(stored)); } catch (e) {}
+    }
+    
+    const storedStudent = localStorage.getItem('vocamaster_logged_in_student');
+    if (storedStudent) {
+      setLoggedInStudent(storedStudent);
+      setCurrentView(AppView.LANDING);
     }
   }, []);
 
@@ -187,13 +195,23 @@ function App() {
     setQuestions([]); 
     setLastResult(null); 
     setIsReviewMode(false); 
-    setCurrentView(AppView.LANDING); 
+    setCurrentView(loggedInStudent ? AppView.LANDING : AppView.STUDENT_LOGIN); 
   };
 
   const renderCurrentView = () => {
     switch (currentView) {
+      case AppView.STUDENT_LOGIN:
+        return (
+          <StudentLogin 
+            onLoginSuccess={(name) => {
+              setLoggedInStudent(name);
+              setCurrentView(AppView.LANDING);
+            }} 
+            onChangeView={setCurrentView} 
+          />
+        );
       case AppView.LANDING:
-        return <Landing onStart={handleStartQuiz} onChangeView={setCurrentView} />;
+        return <Landing onStart={handleStartQuiz} onChangeView={setCurrentView} initialName={loggedInStudent} />;
       case AppView.QUIZ:
         return session && <Quiz questions={questions} settings={session.settings} onComplete={handleQuizComplete} />;
       case AppView.RESULT:
@@ -256,10 +274,22 @@ function App() {
           
           {!isTestInQuiz && (
             <div className="flex items-center gap-4">
-              {currentView === AppView.LANDING && (
-                <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium">선생님</button>
+              {currentView === AppView.LANDING && loggedInStudent && (
+                <button 
+                  onClick={() => {
+                    localStorage.removeItem('vocamaster_logged_in_student');
+                    setLoggedInStudent('');
+                    setCurrentView(AppView.STUDENT_LOGIN);
+                  }} 
+                  className="px-4 py-2 rounded-md bg-gray-100 text-sm font-medium text-gray-600 hover:bg-gray-200"
+                >
+                  로그아웃
+                </button>
               )}
-              {currentView !== AppView.LANDING && (
+              {currentView === AppView.LANDING && (
+                <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100">선생님</button>
+              )}
+              {currentView !== AppView.LANDING && currentView !== AppView.STUDENT_LOGIN && (
                 <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium">닫기</button>
               )}
             </div>

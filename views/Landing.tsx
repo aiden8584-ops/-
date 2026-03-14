@@ -10,10 +10,11 @@ import { Smartphone, Info } from 'lucide-react';
 interface LandingProps {
   onStart: (name: string, className: string, date: string, settings: QuizSettings, mode: 'TEST' | 'PRACTICE') => void;
   onChangeView: (view: AppView) => void;
+  initialName?: string;
 }
 
-const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
-  const [name, setName] = useState('');
+const Landing: React.FC<LandingProps> = ({ onStart, onChangeView, initialName = '' }) => {
+  const [name, setName] = useState(initialName);
   const [className, setClassName] = useState('');
   const [testDate, setTestDate] = useState(new Date().toISOString().split('T')[0]);
   const [hasSheetId, setHasSheetId] = useState(false);
@@ -330,7 +331,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
 
               <div className="space-y-3">
                 <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest">Step 02. 이름 입력</label>
-                <input ref={nameInputRef} type="text" required placeholder="이름을 입력하세요" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-6 py-5 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-xl font-black text-gray-900" />
+                <input ref={nameInputRef} type="text" required placeholder="이름을 입력하세요" value={name} onChange={(e) => setName(e.target.value)} disabled={!!initialName} className={`w-full px-6 py-5 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-xl font-black text-gray-900 ${initialName ? 'opacity-70 cursor-not-allowed' : ''}`} />
                 <input type="date" required value={testDate} onChange={(e) => setTestDate(e.target.value)} className="w-full px-6 py-4 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white text-lg font-bold text-gray-800" />
               </div>
 
