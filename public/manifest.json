@@ -2,7 +2,6 @@
   "name": "PIF단어 시험 시스템",
   "short_name": "PIF단어",
   "description": "PIF영어학원 스마트 단어 시험 시스템",
-  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
