@@ -53,9 +53,27 @@ function App() {
     }
     
     const storedStudent = localStorage.getItem('vocamaster_logged_in_student');
-    if (storedStudent) {
+    const params = new URLSearchParams(window.location.search);
+    const storedSheetId = localStorage.getItem('vocamaster_sheet_id');
+    const urlSheetId = params.get('sheet_id');
+    const hasUrlParams = !!urlSheetId;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    const isSessionVerified = sessionStorage.getItem('vocamaster_session_verified') === 'true';
+    const isDifferentSheet = urlSheetId && urlSheetId !== storedSheetId;
+
+    if (hasUrlParams && (!isStandalone || isDifferentSheet) && (!isSessionVerified || isDifferentSheet)) {
+      // If URL has parameters (e.g., from QR code), not PWA, and not verified in this session, force login.
+      // Also force login if the sheet_id in the URL is different from the stored one.
+      localStorage.removeItem('vocamaster_logged_in_student');
+      sessionStorage.removeItem('vocamaster_session_verified');
+      setLoggedInStudent(null);
+      setCurrentView(AppView.STUDENT_LOGIN);
+    } else if (storedStudent) {
       setLoggedInStudent(storedStudent);
+      sessionStorage.setItem('vocamaster_session_verified', 'true');
       setCurrentView(AppView.LANDING);
+    } else {
+      setCurrentView(AppView.STUDENT_LOGIN);
     }
   }, []);
 
@@ -205,6 +223,7 @@ function App() {
           <StudentLogin 
             onLoginSuccess={(name) => {
               setLoggedInStudent(name);
+              sessionStorage.setItem('vocamaster_session_verified', 'true');
               setCurrentView(AppView.LANDING);
             }} 
             onChangeView={setCurrentView} 
@@ -278,6 +297,7 @@ function App() {
                 <button 
                   onClick={() => {
                     localStorage.removeItem('vocamaster_logged_in_student');
+                    sessionStorage.removeItem('vocamaster_session_verified');
                     setLoggedInStudent('');
                     setCurrentView(AppView.STUDENT_LOGIN);
                   }} 
@@ -289,8 +309,11 @@ function App() {
               {currentView === AppView.LANDING && (
                 <button onClick={() => setCurrentView(AppView.TEACHER_LOGIN)} className="px-4 py-2 rounded-md bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100">선생님</button>
               )}
-              {currentView !== AppView.LANDING && currentView !== AppView.STUDENT_LOGIN && (
-                <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium">닫기</button>
+              {currentView === AppView.TEACHER_DASHBOARD && (
+                <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium hover:text-gray-700">로그아웃</button>
+              )}
+              {currentView !== AppView.LANDING && currentView !== AppView.STUDENT_LOGIN && currentView !== AppView.TEACHER_DASHBOARD && (
+                <button onClick={handleSafeExit} className="text-sm text-gray-500 font-medium hover:text-gray-700">닫기</button>
               )}
             </div>
           )}
