@@ -1,0 +1,35 @@
+
+import { SheetWord } from '../types';
+
+export const SAMPLE_WORDS: SheetWord[] = [
+  { word: "abandon", meaning: "버리다, 포기하다", range: "Sample Set 1" },
+  { word: "ability", meaning: "능력", range: "Sample Set 1" },
+  { word: "abnormal", meaning: "비정상적인", range: "Sample Set 1" },
+  { word: "absolute", meaning: "절대적인", range: "Sample Set 1" },
+  { word: "absorb", meaning: "흡수하다", range: "Sample Set 1" },
+  { word: "abstract", meaning: "추상적인", range: "Sample Set 1" },
+  { word: "abundant", meaning: "풍부한", range: "Sample Set 1" },
+  { word: "academic", meaning: "학업의, 학문적인", range: "Sample Set 1" },
+  { word: "accent", meaning: "강조, 억양", range: "Sample Set 1" },
+  { word: "accept", meaning: "받아들이다", range: "Sample Set 1" },
+  { word: "access", meaning: "접근", range: "Sample Set 2" },
+  { word: "accident", meaning: "사고", range: "Sample Set 2" },
+  { word: "accompany", meaning: "동반하다", range: "Sample Set 2" },
+  { word: "accomplish", meaning: "성취하다", range: "Sample Set 2" },
+  { word: "account", meaning: "계좌, 설명", range: "Sample Set 2" },
+  { word: "accurate", meaning: "정확한", range: "Sample Set 2" },
+  { word: "accuse", meaning: "비난하다, 고소하다", range: "Sample Set 2" },
+  { word: "achieve", meaning: "달성하다", range: "Sample Set 2" },
+  { word: "acknowledge", meaning: "인정하다", range: "Sample Set 2" },
+  { word: "acquire", meaning: "습득하다", range: "Sample Set 2" },
+  { word: "adapt", meaning: "적응하다", range: "Sample Set 3" },
+  { word: "addict", meaning: "중독자", range: "Sample Set 3" },
+  { word: "address", meaning: "주소, 연설하다", range: "Sample Set 3" },
+  { word: "adequate", meaning: "적절한", range: "Sample Set 3" },
+  { word: "adjust", meaning: "조정하다", range: "Sample Set 3" },
+  { word: "admire", meaning: "존경하다", range: "Sample Set 3" },
+  { word: "admit", meaning: "인정하다", range: "Sample Set 3" },
+  { word: "adopt", meaning: "채택하다, 입양하다", range: "Sample Set 3" },
+  { word: "advance", meaning: "진보", range: "Sample Set 3" },
+  { word: "advantage", meaning: "이점", range: "Sample Set 3" }
+];
