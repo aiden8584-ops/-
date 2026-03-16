@@ -177,30 +177,10 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     
     // URL cleaning removed to preserve query parameters when adding to Home Screen
     
-    // Dynamically update manifest to preserve current URL as start_url
-    const updateManifest = () => {
-      const manifestLink = document.querySelector('link[rel="manifest"]');
-      if (manifestLink) {
-        const manifest = {
-          name: "PIF단어 시험 시스템",
-          short_name: "PIF단어",
-          description: "PIF영어학원 스마트 단어 시험 시스템",
-          start_url: window.location.href,
-          display: "standalone",
-          background_color: "#ffffff",
-          theme_color: "#4f46e5",
-          icons: [
-            { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any maskable" },
-            { src: "/icon.svg", sizes: "192x192", type: "image/svg+xml" },
-            { src: "/icon.svg", sizes: "512x512", type: "image/svg+xml" }
-          ]
-        };
-        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-        const manifestURL = URL.createObjectURL(blob);
-        manifestLink.setAttribute('href', manifestURL);
-      }
-    };
-    updateManifest();
+    // Check if the event fired before React mounted
+    if ((window as any).deferredPrompt) {
+      setDeferredPrompt((window as any).deferredPrompt);
+    }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
