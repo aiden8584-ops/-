@@ -46,6 +46,7 @@ export interface StudentIncorrectRecord {
 }
 
 export enum AppView {
+  STUDENT_LOGIN = 'STUDENT_LOGIN',
   LANDING = 'LANDING',
   QUIZ = 'QUIZ',
   RESULT = 'RESULT',

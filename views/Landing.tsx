@@ -175,10 +175,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       useAi: newUseAi
     });
     
-    // Clean URL
-    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi) {
-       window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    // URL cleaning removed to preserve query parameters when adding to Home Screen
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
