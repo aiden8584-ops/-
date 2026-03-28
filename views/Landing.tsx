@@ -175,11 +175,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       useAi: newUseAi
     });
     
-    // URL cleaning removed to preserve query parameters when adding to Home Screen
-    
-    // Check if the event fired before React mounted
-    if ((window as any).deferredPrompt) {
-      setDeferredPrompt((window as any).deferredPrompt);
+    // Clean URL
+    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi) {
+       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);

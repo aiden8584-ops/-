@@ -146,52 +146,6 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
   }
 };
 
-export interface Student {
-  name: string;
-  phoneLast4: string;
-}
-
-export const fetchStudentList = async (sheetId: string): Promise<Student[]> => {
-  const tabName = "학생명단";
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
-  
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`'학생명단' 탭을 찾을 수 없습니다. 시트에 '학생명단' 탭이 있는지 확인해주세요.`);
-    }
-
-    const text = await response.text();
-    const lines = text.split('\n');
-    const students: Student[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      if (i === 0) continue; // Skip header
-      
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const cols = parseCSVLine(line);
-      // Assuming Column A is Name, Column B is Phone Number
-      if (cols.length >= 2) {
-        const name = cols[0].trim();
-        const phone = cols[1].trim();
-        
-        if (name && phone) {
-           // Extract last 4 digits (remove non-digits first)
-           const cleanPhone = phone.replace(/\D/g, '');
-           const phoneLast4 = cleanPhone.slice(-4);
-           students.push({ name, phoneLast4 });
-        }
-      }
-    }
-    return students;
-  } catch (error) {
-    console.error("Failed to fetch student list:", error);
-    throw error;
-  }
-};
-
 export const submitResultToSheet = async (scriptUrl: string, result: QuizResult): Promise<boolean> => {
   try {
     const payload = {
