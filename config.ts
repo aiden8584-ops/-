@@ -31,6 +31,7 @@ export const APP_CONFIG = {
       korToEng: 20,
       context: 10
     },
-    useAi: true
+    useAi: true,
+    difficulty: "ALL" as const
   }
 };

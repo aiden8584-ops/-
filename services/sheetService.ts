@@ -86,49 +86,118 @@ export const fetchWordsFromSheet = async (sheetId: string, tabName: string, mode
     // Define column indices based on mode
     // TEST Mode: B(1), C(2) (A is 범위)
     // PRACTICE Mode: F(5), G(6) (E is 범위)
-    const rangeColIdx = mode === 'PRACTICE' ? 4 : 0;
-    const wordColIdx = mode === 'PRACTICE' ? 5 : 1;
-    const meaningColIdx = mode === 'PRACTICE' ? 6 : 2;
+    let rangeColIdx = mode === 'PRACTICE' ? 4 : 0;
+    let wordColIdx = mode === 'PRACTICE' ? 5 : 1;
+    let meaningColIdx = mode === 'PRACTICE' ? 6 : 2;
+
+    let hasHeaders = false;
+
+    // Phase 1: Try to find headers in the first few rows
+    for (let i = 0; i < Math.min(lines.length, 5); i++) {
+        if (!lines[i].trim()) continue;
+        const rowCols = parseCSVLine(lines[i]);
+        
+        const findIdx = (keywords: string[], minIdx: number = 0) => rowCols.findIndex((col, idx) => {
+            if (idx < minIdx) return false;
+            const lower = col.toLowerCase().replace(/\s+/g, '');
+            return keywords.some(kw => lower.includes(kw));
+        });
+        
+        let minSearchIdx = mode === 'PRACTICE' ? 4 : 0;
+        let foundWordIdx = findIdx(['단어', 'word', 'english', '영어', 'voca', '영단어'], minSearchIdx);
+        let foundMeaningIdx = findIdx(['뜻', 'meaning', 'korean', '우리말', '한글', '의미', '해석', '의미(뜻)'], minSearchIdx);
+        let foundRangeIdx = findIdx(['범위', 'range', '주차', 'day', '챕터', 'chapter', '일차'], minSearchIdx);
+
+        // Fallback for PRACTICE mode: if not found in F/G, search from the beginning (B/C)
+        if (mode === 'PRACTICE' && (foundWordIdx === -1 || foundMeaningIdx === -1)) {
+            foundWordIdx = findIdx(['단어', 'word', 'english', '영어', 'voca', '영단어'], 0);
+            foundMeaningIdx = findIdx(['뜻', 'meaning', 'korean', '우리말', '한글', '의미', '해석', '의미(뜻)'], 0);
+            foundRangeIdx = findIdx(['범위', 'range', '주차', 'day', '챕터', 'chapter', '일차'], 0);
+        }
+
+        if (foundWordIdx !== -1 && foundMeaningIdx !== -1) {
+            wordColIdx = foundWordIdx;
+            meaningColIdx = foundMeaningIdx;
+            rangeColIdx = foundRangeIdx;
+            hasHeaders = true;
+            break;
+        }
+    }
+
+    // Phase 2: If no headers found, fallback to expected columns, adjusting for dropped empty leading columns
+    if (!hasHeaders) {
+        let defaultRange = mode === 'PRACTICE' ? 4 : 0;
+        let defaultWord = mode === 'PRACTICE' ? 5 : 1;
+        let defaultMeaning = mode === 'PRACTICE' ? 6 : 2;
+        
+        let maxCols = 0;
+        for (let i = 0; i < Math.min(lines.length, 10); i++) {
+            if (!lines[i].trim()) continue;
+            const len = parseCSVLine(lines[i]).length;
+            if (len > maxCols) maxCols = len;
+        }
+
+        // If practice mode F/G columns don't exist in the sheet, fall back to "TEST" mode columns
+        if (mode === 'PRACTICE' && maxCols <= defaultMeaning) {
+            defaultRange = 0;
+            defaultWord = 1;
+            defaultMeaning = 2;
+        }
+
+        if (maxCols <= defaultMeaning && maxCols >= 2) {
+            // A leading column (like A) was likely dropped by gviz because it was entirely empty
+            wordColIdx = maxCols - 2;
+            meaningColIdx = maxCols - 1;
+            rangeColIdx = maxCols >= 3 ? maxCols - 3 : -1;
+        } else {
+            // Standard columns
+            wordColIdx = defaultWord;
+            meaningColIdx = defaultMeaning;
+            rangeColIdx = defaultRange;
+        }
+    }
 
     let currentRange = "기본 범위";
 
-    for (let i = 0; i < lines.length; i++) {
-      // Always skip the first row (Header)
-      if (i === 0) continue;
+    const isHeaderLine = (wordCheck: string, meaningCheck: string) => {
+        if (!wordCheck || !meaningCheck) return false;
+        const wLower = wordCheck.toLowerCase().replace(/\s+/g, '');
+        const mLower = meaningCheck.toLowerCase().replace(/\s+/g, '');
+        return ['단어', 'word', 'english', '영어', 'voca', '영단어'].includes(wLower) || 
+               ['뜻', 'meaning', 'korean', '우리말', '한글', '의미', '해석'].includes(mLower);
+    };
 
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
       const cols = parseCSVLine(line);
       
       // Update current range if the cell is not empty
-      if (cols[rangeColIdx] && cols[rangeColIdx].trim() !== '') {
+      if (rangeColIdx !== -1 && cols[rangeColIdx] && cols[rangeColIdx].trim() !== '') {
         currentRange = cols[rangeColIdx].trim();
       }
+
+      const word = cols[wordColIdx];
+      const fullMeaning = cols[meaningColIdx];
       
-      // Check if we have enough columns for the requested indices
-      if (cols.length > Math.max(wordColIdx, meaningColIdx)) {
-        const word = cols[wordColIdx];
-        const fullMeaning = cols[meaningColIdx];
-        
-        // Skip header-like keywords if they appear in data rows (legacy safety check)
-        if (word && (word.toLowerCase() === 'word' || word.toLowerCase() === 'english' || word.toLowerCase() === '단어')) continue;
+      // Skip header lines dynamically
+      if (isHeaderLine(word, fullMeaning)) continue;
 
-        if (word && fullMeaning) {
-          // Remove content within parentheses (e.g., "(adj) happy" -> "happy")
-          // Support both standard () and full-width （） parentheses
-          let cleanedMeaning = fullMeaning
-            .replace(/\([^)]*\)/g, '')
-            .replace(/（[^）]*）/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-            
-          // Remove leading/trailing commas that might remain after removal
-          cleanedMeaning = cleanedMeaning.replace(/^,|,$/g, '').trim();
+      if (word && fullMeaning) {
+        // Remove content within parentheses (e.g., "(adj) happy" -> "happy")
+        // Support both standard () and full-width （） parentheses
+        let cleanedMeaning = fullMeaning
+          .replace(/\([^)]*\)/g, '')
+          .replace(/（[^）]*）/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+          
+        // Remove leading/trailing commas that might remain after removal
+        cleanedMeaning = cleanedMeaning.replace(/^,|,$/g, '').trim();
 
-          if (cleanedMeaning) {
-             words.push({ word, meaning: cleanedMeaning, range: currentRange });
-          }
+        if (cleanedMeaning) {
+           words.push({ word, meaning: cleanedMeaning, range: currentRange });
         }
       }
     }

@@ -77,6 +77,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     
     // New AI Param
     const paramUseAi = params.get('use_ai');
+    const paramDiff = params.get('diff');
 
     // 1. Sheet ID Logic
     if (urlSheetId) {
@@ -122,6 +123,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     let newDistribution: TypeDistribution = { ...APP_CONFIG.defaultSettings.typeDistribution };
     let newTimeLimit = APP_CONFIG.defaultSettings.timeLimitPerQuestion;
     let newUseAi = APP_CONFIG.defaultSettings.useAi ?? true;
+    let newDifficulty: 'ALL' | 'HARD' = APP_CONFIG.defaultSettings.difficulty ?? 'ALL';
 
     // A. Load from LocalStorage (Persistent Defaults)
     const savedSettingsJSON = localStorage.getItem(SETTINGS_KEY);
@@ -137,6 +139,9 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
         if (saved.useAi !== undefined) {
           newUseAi = saved.useAi;
         }
+        if (saved.difficulty !== undefined) {
+          newDifficulty = saved.difficulty;
+        }
       } catch (e) {
         console.warn("Failed to parse saved settings", e);
       }
@@ -145,6 +150,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
     // B. URL Params (Override LocalStorage)
     if (urlTLimit) newTimeLimit = Number(urlTLimit);
     if (paramUseAi !== null) newUseAi = paramUseAi === 'true';
+    if (paramDiff === 'HARD' || paramDiff === 'ALL') newDifficulty = paramDiff;
 
     // Granular params override everything
     if (cntEK !== null || cntKE !== null || cntCtx !== null) {
@@ -172,11 +178,12 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       timeLimitPerQuestion: newTimeLimit,
       questionType: 'mixed', 
       typeDistribution: newDistribution,
-      useAi: newUseAi
+      useAi: newUseAi,
+      difficulty: newDifficulty
     });
     
     // Clean URL
-    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi) {
+    if (urlSheetId || urlScript || urlClass || cntEK || paramUseAi || paramDiff) {
        window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -186,6 +193,11 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  // Save settings to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('vocamaster_quiz_settings_v3', JSON.stringify(quizSettings));
+  }, [quizSettings]);
 
   const loadTabs = async (id: string) => {
     try {
@@ -322,6 +334,7 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                         </span>
                       )}
                       {!quizSettings.useAi && <span className="bg-gray-200 text-gray-500 px-2 py-1 rounded">AI OFF</span>}
+                      {quizSettings.difficulty === 'HARD' && <span className="bg-red-100 text-red-600 px-2 py-1 rounded">어려운 단어</span>}
                     </div>
                   </div>
                   <button type="button" onClick={() => setIsUrlInitialized(false)} className="text-xs font-black text-indigo-600 underline">변경</button>
@@ -333,6 +346,28 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                 <input ref={nameInputRef} type="text" required placeholder="이름을 입력하세요" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-6 py-5 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-xl font-black text-gray-900" />
                 <input type="date" required value={testDate} onChange={(e) => setTestDate(e.target.value)} className="w-full px-6 py-4 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white text-lg font-bold text-gray-800" />
               </div>
+
+              {quizSettings.useAi && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest">Step 03. 난이도 선택</label>
+                  <div className="flex gap-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setQuizSettings({...quizSettings, difficulty: 'ALL'})}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${quizSettings.difficulty !== 'HARD' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'}`}
+                    >
+                      전체 단어 (기본)
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setQuizSettings({...quizSettings, difficulty: 'HARD'})}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${quizSettings.difficulty === 'HARD' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+                    >
+                      어려운 단어만 (AI)
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button 

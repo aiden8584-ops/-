@@ -24,6 +24,7 @@ const TeacherDashboard: React.FC = () => {
   const [timeLimit, setTimeLimit] = useState(APP_CONFIG.defaultSettings.timeLimitPerQuestion);
   const [distribution, setDistribution] = useState<TypeDistribution>(APP_CONFIG.defaultSettings.typeDistribution);
   const [useAi, setUseAi] = useState<boolean>(APP_CONFIG.defaultSettings.useAi ?? true);
+  const [difficulty, setDifficulty] = useState<'ALL' | 'HARD'>(APP_CONFIG.defaultSettings.difficulty ?? 'ALL');
 
   const [availableTabs, setAvailableTabs] = useState<string[]>(PRESET_TABS);
   const [selectedClass, setSelectedClass] = useState('');
@@ -47,6 +48,9 @@ const TeacherDashboard: React.FC = () => {
       if (parsed.useAi !== undefined) {
         setUseAi(parsed.useAi);
       }
+      if (parsed.difficulty !== undefined) {
+        setDifficulty(parsed.difficulty);
+      }
     }
 
     const savedSheetId = localStorage.getItem(SHEET_ID_KEY) || APP_CONFIG.sheetId;
@@ -59,9 +63,10 @@ const TeacherDashboard: React.FC = () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       timeLimitPerQuestion: timeLimit,
       typeDistribution: distribution,
-      useAi: useAi
+      useAi: useAi,
+      difficulty: difficulty
     }));
-  }, [timeLimit, distribution, useAi]);
+  }, [timeLimit, distribution, useAi, difficulty]);
 
   const loadTabs = async (id: string) => {
     if (!id) return;
@@ -101,6 +106,7 @@ const TeacherDashboard: React.FC = () => {
     
     params.set('t_limit', timeLimit.toString());
     params.set('use_ai', useAi.toString());
+    params.set('diff', difficulty);
 
     params.set('date', new Date().toISOString().split('T')[0]);
     
@@ -109,7 +115,7 @@ const TeacherDashboard: React.FC = () => {
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     
     return `${url}/?${params.toString()}`;
-  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit, useAi]);
+  }, [sheetId, scriptUrl, selectedClass, baseUrl, distribution, timeLimit, useAi, difficulty]);
 
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(shareUrl)}`;
 
@@ -156,18 +162,34 @@ const TeacherDashboard: React.FC = () => {
               </button>
             </div>
 
-            {/* AI Toggle Switch */}
-            <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
-              <span className="text-xs font-bold text-gray-500">AI 문제 생성</span>
-              <button 
-                onClick={() => setUseAi(!useAi)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${useAi ? 'bg-indigo-600' : 'bg-gray-300'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useAi ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-              <span className={`text-xs font-bold ${useAi ? 'text-indigo-600' : 'text-gray-400'}`}>
-                {useAi ? 'ON (예문/빈칸)' : 'OFF (기본/빠름)'}
-              </span>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Difficulty Toggle */}
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+                <span className="text-xs font-bold text-gray-500">난이도</span>
+                <button 
+                  onClick={() => setDifficulty(difficulty === 'ALL' ? 'HARD' : 'ALL')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${difficulty === 'HARD' ? 'bg-red-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${difficulty === 'HARD' ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className={`text-xs font-bold ${difficulty === 'HARD' ? 'text-red-500' : 'text-gray-400'}`}>
+                  {difficulty === 'HARD' ? '어려운 단어' : '전체 단어'}
+                </span>
+              </div>
+
+              {/* AI Toggle Switch */}
+              <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
+                <span className="text-xs font-bold text-gray-500">AI 문제 생성</span>
+                <button 
+                  onClick={() => setUseAi(!useAi)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${useAi ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useAi ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className={`text-xs font-bold ${useAi ? 'text-indigo-600' : 'text-gray-400'}`}>
+                  {useAi ? 'ON (예문/빈칸)' : 'OFF (기본/빠름)'}
+                </span>
+              </div>
             </div>
           </div>
 

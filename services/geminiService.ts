@@ -44,8 +44,17 @@ const generateLocalQuiz = (sheetWords: SheetWord[], settings: QuizSettings, isPr
     const dist = settings.typeDistribution;
     const totalNeeded = dist.engToKor + dist.korToEng + dist.context;
     const actualTotal = Math.min(sheetWords.length, totalNeeded);
-    const shuffledSource = shuffleArray(sheetWords);
-    targetWords = shuffledSource.slice(0, actualTotal);
+    
+    if (settings.difficulty === 'HARD') {
+      // Naive fallback: sort by word length descending (longer words = harder)
+      const sortedByLength = [...sheetWords].sort((a, b) => b.word.length - a.word.length);
+      // Take top 2x needed, then shuffle and slice
+      const topHard = sortedByLength.slice(0, Math.max(actualTotal, Math.min(sheetWords.length, actualTotal * 2)));
+      targetWords = shuffleArray(topHard).slice(0, actualTotal);
+    } else {
+      const shuffledSource = shuffleArray(sheetWords);
+      targetWords = shuffledSource.slice(0, actualTotal);
+    }
   }
   
   const allMeanings = sheetWords.map(sw => sw.meaning);
@@ -133,8 +142,10 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
     return generateLocalQuiz(sheetWords, settings, true);
   }
 
-  // EXPLICIT AI DISABLE CHECK OR NO CONTEXT QUESTIONS
-  if (settings.useAi === false || settings.typeDistribution.context === 0) {
+  // EXPLICIT AI DISABLE CHECK
+  // We skip AI if useAi is false.
+  // We also skip AI if context is 0 AND difficulty is not HARD (since AI is only needed for context or difficulty).
+  if (settings.useAi === false || (settings.typeDistribution.context === 0 && settings.difficulty !== 'HARD')) {
     // If user explicitly disabled AI, we skip calling it and use local generation.
     // generateLocalQuiz handles re-distributing 'context' counts to other types.
     return generateLocalQuiz(sheetWords, settings, false);
@@ -143,20 +154,31 @@ export const generateQuizQuestions = async (settings: QuizSettings, sheetWords?:
   const dist = settings.typeDistribution;
   const totalQuestions = dist.engToKor + dist.korToEng + dist.context;
 
-  const shuffled = shuffleArray(sheetWords);
-  const limitedWords = shuffled.slice(0, totalQuestions); 
+  let limitedWords: SheetWord[] = [];
+  let taskDescription = `Generate ${totalQuestions} vocabulary questions based on SOURCE DATA.`;
+
+  if (settings.difficulty === 'HARD') {
+    // Take a larger sample and ask AI to pick the hardest ones
+    const sampleSize = Math.min(sheetWords.length, Math.max(totalQuestions * 3, 100));
+    limitedWords = shuffleArray(sheetWords).slice(0, sampleSize);
+    taskDescription = `Select the ${totalQuestions} MOST DIFFICULT words from SOURCE DATA, and generate vocabulary questions for them.`;
+  } else {
+    const shuffled = shuffleArray(sheetWords);
+    limitedWords = shuffled.slice(0, totalQuestions); 
+  }
   
   const prompt = `
     SOURCE DATA: ${JSON.stringify(limitedWords)}
     FULL POOL (For distractors): ${JSON.stringify(sheetWords.map(s => s.word))} (English), ${JSON.stringify(sheetWords.map(s => s.meaning))} (Korean)
 
-    Task: Generate ${totalQuestions} vocabulary questions based on SOURCE DATA.
+    Task: ${taskDescription}
 
     REQUIREMENTS:
     1. **Types**:
        - ${dist.engToKor} items: 'EngToKor' (Show English -> Select Korean Meaning)
        - ${dist.korToEng} items: 'KorToEng' (Show Korean Meaning -> Select English Word)
        - ${dist.context} items: 'Context' (Fill in the blank sentence -> Select English Word)
+       - Total questions MUST be exactly ${totalQuestions}.
     
     2. **Context Sentence Rule**:
        - Write a simple English sentence with a blank (_______) where the target word fits naturally.

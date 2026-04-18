@@ -20,6 +20,7 @@ export interface QuizSettings {
   questionType: QuestionType; // Kept for legacy/display purposes
   typeDistribution: TypeDistribution;
   useAi?: boolean; // New: Toggle API usage
+  difficulty?: 'ALL' | 'HARD'; // New: Difficulty level
 }
 
 export interface QuizResult {
