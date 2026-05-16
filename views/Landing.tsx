@@ -347,28 +347,6 @@ const Landing: React.FC<LandingProps> = ({ onStart, onChangeView }) => {
                 <input type="date" required value={testDate} onChange={(e) => setTestDate(e.target.value)} className="w-full px-6 py-4 rounded-2xl border-2 border-gray-50 bg-gray-50 focus:bg-white text-lg font-bold text-gray-800" />
               </div>
 
-              {quizSettings.useAi && (
-                <div className="space-y-3">
-                  <label className="block text-xs font-black text-indigo-500 uppercase tracking-widest">Step 03. 난이도 선택</label>
-                  <div className="flex gap-2">
-                    <button 
-                      type="button" 
-                      onClick={() => setQuizSettings({...quizSettings, difficulty: 'ALL'})}
-                      className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${quizSettings.difficulty !== 'HARD' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'}`}
-                    >
-                      전체 단어 (기본)
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => setQuizSettings({...quizSettings, difficulty: 'HARD'})}
-                      className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${quizSettings.difficulty === 'HARD' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'}`}
-                    >
-                      어려운 단어만 (AI)
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Button 
                   type="button" 
